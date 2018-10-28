@@ -40,7 +40,7 @@
 #include "oaes_lib.h"
 
 #define MEMORY         (1 << 21) // 2MB scratchpad
-#define ITER           (1 << 19)
+#define ITER           (1 << 20)
 #define AES_BLOCK_SIZE  16
 #define AES_KEY_SIZE    32
 #define INIT_SIZE_BLK   8
@@ -52,42 +52,25 @@ extern int aesb_pseudo_round(const uint8_t *in, uint8_t *out, const uint8_t *exp
 #define VARIANT1_1(p) \
   do if (variant > 0) \
   { \
-    const uint8_t tmp = ((const uint8_t*)(p))[11]; \
-    static const uint32_t table = 0x75310; \
-    const uint8_t index = (((tmp >> 3) & 6) | (tmp & 1)) << 1; \
-    ((uint8_t*)(p))[11] = tmp ^ ((table >> index) & 0x30); \
+    uint8_t tmp = ((const uint8_t*)p)[11]; \
+    uint8_t tmp1 = (tmp>>4)&1, tmp2 = (tmp>>5)&1, tmp3 = tmp1^tmp2; \
+    uint8_t tmp0 = (((const uint8_t*)p)[11] & 1) ? tmp3 : ((((tmp2<<1)|tmp1) + 1)&3); \
+    ((uint8_t*)p)[11] = (((const uint8_t*)p)[11] & 1) ? ((tmp & 0xef) | (tmp0<<4)):((tmp & 0xcf) | (tmp0<<4)); \
   } while(0)
 
 #define VARIANT1_2(p) \
   do if (variant > 0) \
   { \
-    xor64(p, tweak1_2); \
+    ((uint32_t*)p)[2] ^= nonce; \
   } while(0)
 
-#define VARIANT1_CHECK() \
-  do if (length < 43) \
+#define VARIANT1_INIT() \
+  if (variant > 0 && length < 43) \
   { \
     fprintf(stderr, "Cryptonight variants need at least 43 bytes of data"); \
     _exit(1); \
-  } while(0)
-
-#define NONCE_POINTER (((const uint8_t*)data)+35)
-
-#define VARIANT1_PORTABLE_INIT() \
-  uint8_t tweak1_2[8]; \
-  do if (variant > 0) \
-  { \
-    VARIANT1_CHECK(); \
-    memcpy(&tweak1_2, &state.hs.b[192], sizeof(tweak1_2)); \
-    xor64(tweak1_2, NONCE_POINTER); \
-  } while(0)
-
-#define VARIANT1_INIT64() \
-  if (variant > 0) \
-  { \
-    VARIANT1_CHECK(); \
   } \
-  const uint64_t tweak1_2 = variant > 0 ? (state.hs.w[24] ^ (*((const uint64_t*)NONCE_POINTER))) : 0
+  const uint32_t nonce = variant > 0 ? *(const uint32_t*)(((const uint8_t*)data)+39) : 0
 
 #if !defined NO_AES && (defined(__x86_64__) || (defined(_MSC_VER) && defined(_WIN64)))
 // Optimised code below, uses x86-specific intrinsics, SSE2, AES-NI
@@ -176,8 +159,8 @@ extern int aesb_pseudo_round(const uint8_t *in, uint8_t *out, const uint8_t *exp
   p = U64(&hp_state[j]); \
   p[0] = a[0];  p[1] = a[1]; \
   a[0] ^= b[0]; a[1] ^= b[1]; \
-  VARIANT1_2(p + 1); \
   _b = _c; \
+  VARIANT1_2(&hp_state[j]); \
 
 #if defined(_MSC_VER)
 #define THREADV __declspec(thread)
@@ -227,11 +210,6 @@ STATIC INLINE void xor_blocks(uint8_t *a, const uint8_t *b)
     U64(a)[1] ^= U64(b)[1];
 }
 
-STATIC INLINE void xor64(uint64_t *a, const uint64_t b)
-{
-    *a ^= b;
-}
-
 /**
  * @brief uses cpuid to determine if the CPU supports the AES instructions
  * @return true if the CPU supports AES, false otherwise
@@ -244,7 +222,7 @@ STATIC INLINE int force_software_aes(void)
   if (use != -1)
     return use;
 
-  const char *env = getenv("ARQMA_USE_SOFTWARE_AES");
+  const char *env = getenv("MONERO_USE_SOFTWARE_AES");
   if (!env) {
     use = 0;
   }
@@ -524,7 +502,7 @@ void slow_hash_free_state(void)
     else
     {
 #if defined(_MSC_VER) || defined(__MINGW32__)
-        VirtualFree(hp_state, 0, MEM_RELEASE);
+        VirtualFree(hp_state, MEMORY, MEM_RELEASE);
 #else
         munmap(hp_state, MEMORY);
 #endif
@@ -564,7 +542,11 @@ void slow_hash_free_state(void)
  * @param length the length in bytes of the data
  * @param hash a pointer to a buffer in which the final 256 bit hash will be stored
  */
-void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int prehashed)
+void cn_slow_hash(const void *data, size_t length, char *hash, int variant) {
+    cn_slow_hash_pre(data,length,hash,variant,false);
+}
+
+void cn_slow_hash_pre(const void *data, size_t length, char *hash, int variant, bool prehashed)
 {
     RDATA_ALIGN16 uint8_t expandedKey[240];  /* These buffers are aligned to use later with SSE functions */
 
@@ -586,6 +568,8 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
         hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
     };
 
+    VARIANT1_INIT();
+
     // this isn't supposed to happen, but guard against it for now.
     if(hp_state == NULL)
         slow_hash_allocate_state();
@@ -597,8 +581,6 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
         hash_process(&state.hs, data, length);
     }
     memcpy(text, state.init, INIT_SIZE_BYTE);
-
-    VARIANT1_INIT64();
 
     /* CryptoNight Step 2:  Iteratively encrypt the results from Keccak to fill
      * the 2MB large random access buffer.
@@ -641,7 +623,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
     // the useAes test is only performed once, not every iteration.
     if(useAes)
     {
-        for(i = 0; i < ITER; i++)
+        for(i = 0; i < ITER / 2; i++)
         {
             pre_aes();
             _c = _mm_aesenc_si128(_c, _a);
@@ -650,7 +632,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
     }
     else
     {
-        for(i = 0; i < ITER; i++)
+        for(i = 0; i < ITER / 2; i++)
         {
             pre_aes();
             aesb_single_round((uint8_t *) &_c, (uint8_t *) &_c, (uint8_t *) &_a);
@@ -723,11 +705,6 @@ void slow_hash_free_state(void)
 
 #define U64(x) ((uint64_t *) (x))
 
-STATIC INLINE void xor64(uint64_t *a, const uint64_t b)
-{
-    *a ^= b;
-}
-
 #pragma pack(push, 1)
 union cn_slow_hash_state
 {
@@ -773,7 +750,7 @@ union cn_slow_hash_state
   p = U64(&hp_state[j]); \
   p[0] = a[0];  p[1] = a[1]; \
   a[0] ^= b[0]; a[1] ^= b[1]; \
-  VARIANT1_2(p + 1); \
+  VARIANT1_2(p); \
   _b = _c; \
 
 
@@ -905,34 +882,10 @@ STATIC INLINE void aes_pseudo_round_xor(const uint8_t *in, uint8_t *out, const u
 	}
 }
 
-STATIC INLINE void* aligned_malloc(size_t size, size_t align)
-{
-    void *result;
-#ifdef _MSC_VER
-    result = _aligned_malloc(size, align);
-#else
-    if (posix_memalign(&result, align, size)) result = NULL;
-#endif
-    return result;
-}
- STATIC INLINE void aligned_free(void *ptr)
-{
-#ifdef _MSC_VER
-    _aligned_free(ptr);
-#else
-    free(ptr);
-#endif
-}
-
-void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int prehashed)
+void cn_slow_hash(const void *data, size_t length, char *hash, int variant)
 {
     RDATA_ALIGN16 uint8_t expandedKey[240];
-
-#ifndef FORCE_USE_HEAP
     RDATA_ALIGN16 uint8_t hp_state[MEMORY];
-#else
-        uint8_t *hp_state = (uint8_t *)aligned_malloc(MEMORY,16);
-#endif
 
     uint8_t text[INIT_SIZE_BYTE];
     RDATA_ALIGN16 uint64_t a[2];
@@ -950,16 +903,12 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
         hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
     };
 
+    VARIANT1_INIT();
+
     /* CryptoNight Step 1:  Use Keccak1600 to initialize the 'state' (and 'text') buffers from the data. */
 
-    if (prehashed) {
-        memcpy(&state.hs, data, length);
-    } else {
-        hash_process(&state.hs, data, length);
-    }
+    hash_process(&state.hs, data, length);
     memcpy(text, state.init, INIT_SIZE_BYTE);
-
-    VARIANT1_INIT64();
 
     /* CryptoNight Step 2:  Iteratively encrypt the results from Keccak to fill
      * the 2MB large random access buffer.
@@ -985,7 +934,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
     _b = vld1q_u8((const uint8_t *)b);
 
 
-    for(i = 0; i < ITER; i++)
+    for(i = 0; i < ITER / 2; i++)
     {
         pre_aes();
         _c = vaeseq_u8(_c, zero);
@@ -1018,10 +967,6 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
     hash_permutation(&state.hs);
     extra_hashes[state.hs.b[0] & 3](&state, 200, hash);
 }
-
-#ifdef FORCE_USE_HEAP
-    aligned_free(hp_state);
-#endif
 #else /* aarch64 && crypto */
 
 // ND: Some minor optimizations for ARMv7 (raspberrry pi 2), effect seems to be ~40-50% faster.
@@ -1133,7 +1078,7 @@ STATIC INLINE void xor_blocks(uint8_t* a, const uint8_t* b)
   U64(a)[1] ^= U64(b)[1];
 }
 
-void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int prehashed)
+void cn_slow_hash(const void *data, size_t length, char *hash, int variant)
 {
     uint8_t text[INIT_SIZE_BYTE];
     uint8_t a[AES_BLOCK_SIZE];
@@ -1152,20 +1097,17 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
         hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
     };
 
+    VARIANT1_INIT();
+
 #ifndef FORCE_USE_HEAP
     uint8_t long_state[MEMORY];
 #else
-    uint8_t *long_state = (uint8_t *)malloc(MEMORY);
+    uint8_t *long_state = NULL;
+    long_state = (uint8_t *)malloc(MEMORY);
 #endif
 
-    if (prehashed) {
-        memcpy(&state.hs, data, length);
-    } else {
-        hash_process(&state.hs, data, length);
-    }
+    hash_process(&state.hs, data, length);
     memcpy(text, state.init, INIT_SIZE_BYTE);
-
-    VARIANT1_INIT64();
 
     aes_ctx = (oaes_ctx *) oaes_alloc();
     oaes_key_import_data(aes_ctx, state.hs.b, AES_KEY_SIZE);
@@ -1184,7 +1126,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
     U64(b)[0] = U64(&state.k[16])[0] ^ U64(&state.k[48])[0];
     U64(b)[1] = U64(&state.k[16])[1] ^ U64(&state.k[48])[1];
 
-    for(i = 0; i < ITER; i++)
+    for(i = 0; i < ITER / 2; i++)
     {
       #define MASK ((uint32_t)(((MEMORY / AES_BLOCK_SIZE) - 1) << 4))
       #define state_index(x) ((*(uint32_t *) x) & MASK)
@@ -1206,7 +1148,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
       swap_blocks(b, p);
       xor_blocks(b, p);
       swap_blocks(a, b);
-      VARIANT1_2(U64(p) + 1);
+      VARIANT1_2(p);
     }
 
     memcpy(text, state.init, INIT_SIZE_BYTE);
@@ -1301,15 +1243,6 @@ static void xor_blocks(uint8_t* a, const uint8_t* b) {
   }
 }
 
-static void xor64(uint8_t* left, const uint8_t* right)
-{
-  size_t i;
-  for (i = 0; i < 8; ++i)
-  {
-    left[i] ^= right[i];
-  }
-}
-
 #pragma pack(push, 1)
 union cn_slow_hash_state {
   union hash_state hs;
@@ -1320,12 +1253,8 @@ union cn_slow_hash_state {
 };
 #pragma pack(pop)
 
-void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int prehashed) {
-#ifndef FORCE_USE_HEAP
+void cn_slow_hash(const void *data, size_t length, char *hash, int variant) {
   uint8_t long_state[MEMORY];
-#else
-  uint8_t *long_state = (uint8_t *)malloc(MEMORY);
-#endif
   union cn_slow_hash_state state;
   uint8_t text[INIT_SIZE_BYTE];
   uint8_t a[AES_BLOCK_SIZE];
@@ -1336,16 +1265,12 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
   uint8_t aes_key[AES_KEY_SIZE];
   oaes_ctx *aes_ctx;
 
-  if (prehashed) {
-    memcpy(&state.hs, data, length);
-  } else {
-    hash_process(&state.hs, data, length);
-  }
+  VARIANT1_INIT();
+
+  hash_process(&state.hs, data, length);
   memcpy(text, state.init, INIT_SIZE_BYTE);
   memcpy(aes_key, state.hs.b, AES_KEY_SIZE);
   aes_ctx = (oaes_ctx *) oaes_alloc();
-
-  VARIANT1_PORTABLE_INIT();
 
   oaes_key_import_data(aes_ctx, aes_key, AES_KEY_SIZE);
   for (i = 0; i < MEMORY / INIT_SIZE_BYTE; i++) {
@@ -1360,7 +1285,7 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
     b[i] = state.k[16 + i] ^ state.k[48 + i];
   }
 
-  for (i = 0; i < ITER; i++) {
+  for (i = 0; i < ITER / 2; i++) {
     /* Dependency chain: address -> read value ------+
      * written value <-+ hard function (AES or MUL) <+
      * next address  <-+
@@ -1382,10 +1307,10 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
     sum_half_blocks(b, d);
     swap_blocks(b, c);
     xor_blocks(b, c);
-    VARIANT1_2(c + 8);
     copy_block(&long_state[j * AES_BLOCK_SIZE], c);
     assert(j == e2i(a, MEMORY / AES_BLOCK_SIZE));
     swap_blocks(a, b);
+    VARIANT1_2(&long_state[j * AES_BLOCK_SIZE]);
   }
 
   memcpy(text, state.init, INIT_SIZE_BYTE);
@@ -1401,10 +1326,6 @@ void cn_slow_hash(const void *data, size_t length, char *hash, int variant, int 
   /*memcpy(hash, &state, 32);*/
   extra_hashes[state.hs.b[0] & 3](&state, 200, hash);
   oaes_free((OAES_CTX **) &aes_ctx);
-
-#ifdef FORCE_USE_HEAP
-  free(long_state);
-#endif
 }
 
 #endif
