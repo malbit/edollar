@@ -735,7 +735,7 @@ namespace cryptonote
         return "millidollar";
       case 3:
         return "microdollar";
-      case 3:
+      case 0:
         return "nanodollar";
       default:
         ASSERT_MES_AND_THROW("Invalid decimal point specification: " << default_decimal_point);
@@ -914,7 +914,7 @@ namespace cryptonote
   bool get_block_longhash(const block& b, crypto::hash& res, uint64_t height)
   {
     blobdata bd = get_block_hashing_blob(b);
-    const int cn_variant;
+    int cn_variant;
 
     if(b.major_version >= 2) {
       cn_variant = 1;
