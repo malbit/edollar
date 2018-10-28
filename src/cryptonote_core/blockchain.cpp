@@ -720,7 +720,7 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
   LOG_PRINT_L3("Blockchain::" << __func__);
   CRITICAL_REGION_LOCAL(m_blockchain_lock);
   std::vector<uint64_t> timestamps;
-  std::vector<difficulty_type> cumulative_difficulties;
+  std::vector<difficulty_type> difficulties;
   auto height = m_db->height();
   size_t difficulty_blocks_count;
   uint8_t version = get_current_hard_fork_version();
@@ -767,11 +767,12 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
 
     m_timestamps_and_difficulties_height = height;
     m_timestamps = timestamps;
+    difficulties = m_difficulties;
   }
   if (version == 1) {
-    return next_difficulty(timestamps, difficulties, DIFFICULTY_TARGET);
+    return next_difficulty(timestamps, difficulties, DIFFICULTY_TARGET_V1);
   } else {
-    return next_difficulty_v2(timestamps, cumulative_difficulties);
+    return next_difficulty_v2(timestamps, difficulties);
   }
 }
 //------------------------------------------------------------------
@@ -978,9 +979,9 @@ difficulty_type Blockchain::get_next_difficulty_for_alternative_chain(const std:
   }
 
   if (version == 1) {
-    return next_difficulty(timestamps, difficulties, DIFFICULTY_TARGET);
+    return next_difficulty(timestamps, difficulties, DIFFICULTY_TARGET_V1);
   } else {
-    return next_difficulty_v2(timestamps, cumulative_difficulties);
+    return next_difficulty_v2(timestamps, difficulties);
   }
 }
 //------------------------------------------------------------------
