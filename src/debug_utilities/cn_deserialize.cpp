@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -27,6 +26,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <boost/filesystem.hpp>
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/blockchain.h"
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
 
   if (command_line::get_arg(vm, command_line::arg_help))
   {
-    std::cout << "Edollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL << ENDL;
+    std::cout << "eDollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL << ENDL;
     std::cout << desc_options << std::endl;
     return 1;
   }
@@ -154,7 +154,11 @@ int main(int argc, char* argv[])
     std::cout << "Parsed transaction:" << std::endl;
     std::cout << cryptonote::obj_to_json_str(tx) << std::endl;
 
-    if (cryptonote::parse_tx_extra(tx.extra, fields))
+    bool parsed = cryptonote::parse_tx_extra(tx.extra, fields);
+    if (!parsed)
+      std::cout << "Failed to parse tx_extra" << std::endl;
+
+    if (!fields.empty())
     {
       std::cout << "tx_extra has " << fields.size() << " field(s)" << std::endl;
       for (size_t n = 0; n < fields.size(); ++n)
@@ -171,7 +175,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-      std::cout << "Failed to parse tx_extra" << std::endl;
+      std::cout << "No fields were found in tx_extra" << std::endl;
     }
   }
   else

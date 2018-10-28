@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -29,11 +28,11 @@
 //
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
-#include "wallet/wallet2_api.h"
+#include "wallet/api/wallet2_api.h"
 #include <string>
 #include <ctime>
 
-namespace Edollar {
+namespace edollar {
 
 class TransactionHistoryImpl;
 
@@ -54,8 +53,10 @@ public:
     virtual std::set<uint32_t> subaddrIndex() const;
     virtual uint32_t subaddrAccount() const;
     virtual std::string label() const;
+
     virtual std::string hash() const;
     virtual std::time_t timestamp() const;
+    virtual std::string paymentId() const;
     virtual const std::vector<Transfer> &transfers() const;
     virtual uint64_t confirmations() const;
     virtual uint64_t unlockTime() const;
@@ -72,6 +73,7 @@ private:
     std::string m_label;
     std::string m_hash;
     std::time_t m_timestamp;
+    std::string m_paymentid;
     std::vector<Transfer> m_transfers;
     uint64_t    m_confirmations;
     uint64_t    m_unlock_time;
@@ -81,5 +83,3 @@ private:
 };
 
 } // namespace
-
-

@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -43,7 +42,7 @@
 
 using namespace epee;
 
-namespace Edollar {
+namespace edollar {
 
 TransactionHistory::~TransactionHistory() {}
 
@@ -116,13 +115,17 @@ void TransactionHistoryImpl::refresh()
     // - payment_details              - input transfers
 
     // payments are "input transactions";
-    // one input transaction contains only one transfer. e.g. <transaction_id> - <100EDC>
+    // one input transaction contains only one transfer. e.g. <transaction_id> - <100XMR>
 
     std::list<std::pair<crypto::hash, tools::wallet2::payment_details>> in_payments;
     m_wallet->m_wallet->get_payments(in_payments, min_height, max_height);
     for (std::list<std::pair<crypto::hash, tools::wallet2::payment_details>>::const_iterator i = in_payments.begin(); i != in_payments.end(); ++i) {
         const tools::wallet2::payment_details &pd = i->second;
+        std::string payment_id = string_tools::pod_to_hex(i->first);
+        if (payment_id.substr(16).find_first_not_of('0') == std::string::npos)
+            payment_id = payment_id.substr(0,16);
         TransactionInfoImpl * ti = new TransactionInfoImpl();
+        ti->m_paymentid = payment_id;
         ti->m_amount    = pd.m_amount;
         ti->m_direction = TransactionInfo::Direction_In;
         ti->m_hash      = string_tools::pod_to_hex(pd.m_tx_hash);
@@ -140,8 +143,8 @@ void TransactionHistoryImpl::refresh()
     // confirmed output transactions
     // one output transaction may contain more than one money transfer, e.g.
     // <transaction_id>:
-    //    transfer1: 100EDC to <address_1>
-    //    transfer2: 50EDC  to <address_2>
+    //    transfer1: 100XMR to <address_1>
+    //    transfer2: 50XMR  to <address_2>
     //    fee: fee charged per transaction
     //
 
@@ -150,14 +153,21 @@ void TransactionHistoryImpl::refresh()
 
     for (std::list<std::pair<crypto::hash, tools::wallet2::confirmed_transfer_details>>::const_iterator i = out_payments.begin();
          i != out_payments.end(); ++i) {
-        
+
         const crypto::hash &hash = i->first;
         const tools::wallet2::confirmed_transfer_details &pd = i->second;
-        
+
         uint64_t change = pd.m_change == (uint64_t)-1 ? 0 : pd.m_change; // change may not be known
         uint64_t fee = pd.m_amount_in - pd.m_amount_out;
 
+
+        std::string payment_id = string_tools::pod_to_hex(i->second.m_payment_id);
+        if (payment_id.substr(16).find_first_not_of('0') == std::string::npos)
+            payment_id = payment_id.substr(0,16);
+
+
         TransactionInfoImpl * ti = new TransactionInfoImpl();
+        ti->m_paymentid = payment_id;
         ti->m_amount = pd.m_amount_in - change - fee;
         ti->m_fee    = fee;
         ti->m_direction = TransactionInfo::Direction_Out;
@@ -184,9 +194,13 @@ void TransactionHistoryImpl::refresh()
         const crypto::hash &hash = i->first;
         uint64_t amount = pd.m_amount_in;
         uint64_t fee = amount - pd.m_amount_out;
+        std::string payment_id = string_tools::pod_to_hex(i->second.m_payment_id);
+        if (payment_id.substr(16).find_first_not_of('0') == std::string::npos)
+            payment_id = payment_id.substr(0,16);
         bool is_failed = pd.m_state == tools::wallet2::unconfirmed_transfer_details::failed;
-        
+
         TransactionInfoImpl * ti = new TransactionInfoImpl();
+        ti->m_paymentid = payment_id;
         ti->m_amount = amount - pd.m_change - fee;
         ti->m_fee    = fee;
         ti->m_direction = TransactionInfo::Direction_Out;
@@ -200,14 +214,18 @@ void TransactionHistoryImpl::refresh()
         ti->m_confirmations = 0;
         m_history.push_back(ti);
     }
-    
-    
+
+
     // unconfirmed payments (tx pool)
-    std::list<std::pair<crypto::hash, tools::wallet2::payment_details>> upayments;
+    std::list<std::pair<crypto::hash, tools::wallet2::pool_payment_details>> upayments;
     m_wallet->m_wallet->get_unconfirmed_payments(upayments);
-    for (std::list<std::pair<crypto::hash, tools::wallet2::payment_details>>::const_iterator i = upayments.begin(); i != upayments.end(); ++i) {  
-        const tools::wallet2::payment_details &pd = i->second;
+    for (std::list<std::pair<crypto::hash, tools::wallet2::pool_payment_details>>::const_iterator i = upayments.begin(); i != upayments.end(); ++i) {
+        const tools::wallet2::payment_details &pd = i->second.m_pd;
+        std::string payment_id = string_tools::pod_to_hex(i->first);
+        if (payment_id.substr(16).find_first_not_of('0') == std::string::npos)
+            payment_id = payment_id.substr(0,16);
         TransactionInfoImpl * ti = new TransactionInfoImpl();
+        ti->m_paymentid = payment_id;
         ti->m_amount    = pd.m_amount;
         ti->m_direction = TransactionInfo::Direction_In;
         ti->m_hash      = string_tools::pod_to_hex(pd.m_tx_hash);
@@ -219,12 +237,10 @@ void TransactionHistoryImpl::refresh()
         ti->m_timestamp = pd.m_timestamp;
         ti->m_confirmations = 0;
         m_history.push_back(ti);
-        
+
         LOG_PRINT_L1(__FUNCTION__ << ": Unconfirmed payment found " << pd.m_amount);
     }
-     
+
 }
 
 } // namespace
-
-

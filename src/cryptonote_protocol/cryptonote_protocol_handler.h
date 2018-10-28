@@ -1,9 +1,8 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
-/// @author rfree (current maintainer/user in edollar.cc project - most of code is from CryptoNote)
+/// @file
+/// @author rfree (current maintainer/user in monero.cc project - most of code is from CryptoNote)
 /// @brief This is the orginal cryptonote protocol network-events handler, modified by us
 
-// Copyright (c) 2017, edollar project (fork from Monero) 
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -37,7 +36,6 @@
 
 #include <boost/program_options/variables_map.hpp>
 #include <string>
-#include <ctime>
 
 #include "math_helper.h"
 #include "storages/levin_abstract_invoke2.h"
@@ -47,8 +45,6 @@
 #include "block_queue.h"
 #include "cryptonote_basic/connection_context.h"
 #include "cryptonote_basic/cryptonote_stat_info.h"
-#include "cryptonote_basic/verification_context.h"
-// #include <netinet/in.h>
 #include <boost/circular_buffer.hpp>
 
 PUSH_WARNINGS
@@ -173,8 +169,5 @@ namespace cryptonote
   };
 
 } // namespace
-
-
-#include "cryptonote_protocol_handler.inl"
 
 POP_WARNINGS

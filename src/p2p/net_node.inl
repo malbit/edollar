@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -31,11 +30,10 @@
 
 // IP blocking adapted from Boolberry
 
-#pragma once
-
 #include <algorithm>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/bind.hpp>
 #include <atomic>
 
 #include "version.h"
@@ -49,6 +47,7 @@
 #include "net/local_ip.h"
 #include "crypto/crypto.h"
 #include "storages/levin_abstract_invoke2.h"
+#include "cryptonote_core/cryptonote_core.h"
 
 // We have to look for miniupnpc headers in different places, dependent on if its compiled or external
 #ifdef UPNP_STATIC
@@ -66,45 +65,10 @@
 
 #define NET_MAKE_IP(b1,b2,b3,b4)  ((LPARAM)(((DWORD)(b1)<<24)+((DWORD)(b2)<<16)+((DWORD)(b3)<<8)+((DWORD)(b4))))
 
-#define MIN_WANTED_SEED_NODES 12
+#define MIN_WANTED_SEED_NODES 3
 
 namespace nodetool
 {
-  namespace
-  {
-    const int64_t default_limit_up = 2048;
-    const int64_t default_limit_down = 8192;
-    const command_line::arg_descriptor<std::string> arg_p2p_bind_ip        = {"p2p-bind-ip", "Interface for p2p network protocol", "0.0.0.0"};
-    const command_line::arg_descriptor<std::string> arg_p2p_bind_port = {
-        "p2p-bind-port"
-      , "Port for p2p network protocol"
-      , std::to_string(config::P2P_DEFAULT_PORT)
-      };
-    const command_line::arg_descriptor<std::string> arg_testnet_p2p_bind_port = {
-        "testnet-p2p-bind-port"
-      , "Port for testnet p2p network protocol"
-      , std::to_string(config::testnet::P2P_DEFAULT_PORT)
-      };
-    const command_line::arg_descriptor<uint32_t>    arg_p2p_external_port  = {"p2p-external-port", "External port for p2p network protocol (if port forwarding used with NAT)", 0};
-    const command_line::arg_descriptor<bool>        arg_p2p_allow_local_ip = {"allow-local-ip", "Allow local ip add to peer list, mostly in debug purposes"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_peer   = {"add-peer", "Manually add peer to local peerlist"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_priority_node   = {"add-priority-node", "Specify list of peers to connect to and attempt to keep the connection open"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_exclusive_node   = {"add-exclusive-node", "Specify list of peers to connect to only."
-                                                                                                  " If this option is given the options add-priority-node and seed-node are ignored"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node   = {"seed-node", "Connect to a node to retrieve peer addresses, and disconnect"};
-    const command_line::arg_descriptor<bool> arg_p2p_hide_my_port   =    {"hide-my-port", "Do not announce yourself as peerlist candidate", false, true};
-
-    const command_line::arg_descriptor<bool>        arg_no_igd  = {"no-igd", "Disable UPnP port mapping"};
-    const command_line::arg_descriptor<bool>        arg_offline = {"offline", "Do not listen for peers, nor connect to any"};
-    const command_line::arg_descriptor<int64_t>     arg_out_peers = {"out-peers", "set max number of out peers", -1};
-    const command_line::arg_descriptor<int> arg_tos_flag = {"tos-flag", "set TOS flag", -1};
-
-    const command_line::arg_descriptor<int64_t> arg_limit_rate_up = {"limit-rate-up", "set limit-rate-up [kB/s]", -1};
-    const command_line::arg_descriptor<int64_t> arg_limit_rate_down = {"limit-rate-down", "set limit-rate-down [kB/s]", -1};
-    const command_line::arg_descriptor<int64_t> arg_limit_rate = {"limit-rate", "set limit-rate [kB/s]", -1};
-
-    const command_line::arg_descriptor<bool> arg_save_graph = {"save-graph", "Save data for dr edollar", false};
-  }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   void node_server<t_payload_net_handler>::init_options(boost::program_options::options_description& desc)
@@ -120,7 +84,6 @@ namespace nodetool
     command_line::add_arg(desc, arg_p2p_seed_node);
     command_line::add_arg(desc, arg_p2p_hide_my_port);
     command_line::add_arg(desc, arg_no_igd);
-    command_line::add_arg(desc, arg_offline);
     command_line::add_arg(desc, arg_out_peers);
     command_line::add_arg(desc, arg_tos_flag);
     command_line::add_arg(desc, arg_limit_rate_up);
@@ -306,7 +269,7 @@ namespace nodetool
     m_external_port = command_line::get_arg(vm, arg_p2p_external_port);
     m_allow_local_ip = command_line::get_arg(vm, arg_p2p_allow_local_ip);
     m_no_igd = command_line::get_arg(vm, arg_no_igd);
-    m_offline = command_line::get_arg(vm, arg_offline);
+    m_offline = command_line::get_arg(vm, cryptonote::arg_offline);
 
     if (command_line::has_arg(vm, arg_p2p_add_peer))
     {
@@ -410,23 +373,13 @@ namespace nodetool
     std::set<std::string> full_addrs;
     if (testnet)
     {
-      full_addrs.insert("80.211.160.206:43030");
-      full_addrs.insert("159.65.159.89:43030");
+      full_addrs.insert("127.0.0.1:43030");
     }
     else
     {
       full_addrs.insert("144.217.241.16:33030");
       full_addrs.insert("139.99.106.122:33030");
       full_addrs.insert("77.103.133.157:33030");
-      //full_addrs.insert("80.211.162.91:33030");
-      //full_addrs.insert("159.65.159.89:33030");
-      //full_addrs.insert("80.211.14.160:33030");
-      //full_addrs.insert("207.148.69.20:33030");
-      //full_addrs.insert("80.211.160.206:33030");
-      //full_addrs.insert("108.61.217.173:33030");
-      //full_addrs.insert("198.13.48.167:33030");
-      //full_addrs.insert("192.243.102.49:33030");
-      //full_addrs.insert("192.243.102.173:33030");
     }
     return full_addrs;
   }
@@ -436,7 +389,7 @@ namespace nodetool
   bool node_server<t_payload_net_handler>::init(const boost::program_options::variables_map& vm)
   {
     std::set<std::string> full_addrs;
-    m_testnet = command_line::get_arg(vm, command_line::arg_testnet_on);
+    m_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
 
     if (m_testnet)
     {
@@ -537,7 +490,7 @@ namespace nodetool
     bool res = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(res, false, "Failed to handle command line");
 
-    auto config_arg = m_testnet ? command_line::arg_testnet_data_dir : command_line::arg_data_dir;
+    auto config_arg = m_testnet ? cryptonote::arg_testnet_data_dir : cryptonote::arg_data_dir;
     m_config_folder = command_line::get_arg(vm, config_arg);
 
     if ((!m_testnet && m_port != std::to_string(::config::P2P_DEFAULT_PORT))
@@ -562,7 +515,7 @@ namespace nodetool
 
     //configure self
     m_net_server.set_threads_prefix("P2P");
-    m_net_server.get_config_object().m_pcommands_handler = this;
+    m_net_server.get_config_object().set_handler(this);
     m_net_server.get_config_object().m_invoke_timeout = P2P_DEFAULT_INVOKE_TIMEOUT;
     m_net_server.set_connection_filter(this);
 
@@ -687,6 +640,10 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::send_stop_signal()
   {
+    MDEBUG("[node] sending stop signal");
+    m_net_server.send_stop_signal();
+    MDEBUG("[node] Stop signal sent");
+
     std::list<boost::uuids::uuid> connection_ids;
     m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt) {
       connection_ids.push_back(cntxt.m_connection_id);
@@ -696,8 +653,7 @@ namespace nodetool
       m_net_server.get_config_object().close(connection_id);
 
     m_payload_handler.stop();
-    m_net_server.send_stop_signal();
-    MDEBUG("[node] Stop signal sent");
+
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -775,7 +731,7 @@ namespace nodetool
     }
     else
     {
-      try_get_support_flags(context_, [](p2p_connection_context& flags_context, const uint32_t& support_flags) 
+      try_get_support_flags(context_, [](p2p_connection_context& flags_context, const uint32_t& support_flags)
       {
         flags_context.support_flags = support_flags;
       });
@@ -1097,7 +1053,10 @@ namespace nodetool
         max_random_index = std::min<uint64_t>(local_peers_count -1, 20);
         random_index = get_random_index_with_fixed_probability(max_random_index);
       } else {
-        random_index = crypto::rand<size_t>() % m_peerlist.get_gray_peers_count();
+        local_peers_count = m_peerlist.get_gray_peers_count();
+        if (!local_peers_count)
+          return false;
+        random_index = crypto::rand<size_t>() % local_peers_count;
       }
 
       CHECK_AND_ASSERT_MES(random_index < local_peers_count, false, "random_starter_index < peers_local.size() failed!!");
@@ -1142,7 +1101,7 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::connect_to_seed()
   {
-      if (m_seed_nodes.empty())
+      if (m_seed_nodes.empty() || m_offline)
         return true;
 
       size_t try_count = 0;
@@ -1585,25 +1544,25 @@ namespace nodetool
     COMMAND_REQUEST_SUPPORT_FLAGS::request support_flags_request;
     bool r = epee::net_utils::async_invoke_remote_command2<typename COMMAND_REQUEST_SUPPORT_FLAGS::response>
     (
-      context.m_connection_id, 
-      COMMAND_REQUEST_SUPPORT_FLAGS::ID, 
-      support_flags_request, 
+      context.m_connection_id,
+      COMMAND_REQUEST_SUPPORT_FLAGS::ID,
+      support_flags_request,
       m_net_server.get_config_object(),
       [=](int code, const typename COMMAND_REQUEST_SUPPORT_FLAGS::response& rsp, p2p_connection_context& context_)
-      {  
+      {
         if(code < 0)
         {
           LOG_WARNING_CC(context_, "COMMAND_REQUEST_SUPPORT_FLAGS invoke failed. (" << code <<  ", " << epee::levin::get_err_descr(code) << ")");
           return;
         }
-        
+
         f(context_, rsp.support_flags);
       },
       P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT
     );
 
     return r;
-  }  
+  }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   int node_server<t_payload_net_handler>::handle_timed_sync(int command, typename COMMAND_TIMED_SYNC::request& arg, typename COMMAND_TIMED_SYNC::response& rsp, p2p_connection_context& context)
@@ -1689,8 +1648,8 @@ namespace nodetool
         LOG_DEBUG_CC(context, "PING SUCCESS " << context.m_remote_address.host_str() << ":" << port_l);
       });
     }
-    
-    try_get_support_flags(context, [](p2p_connection_context& flags_context, const uint32_t& support_flags) 
+
+    try_get_support_flags(context, [](p2p_connection_context& flags_context, const uint32_t& support_flags)
     {
       flags_context.support_flags = support_flags;
     });
@@ -1845,9 +1804,8 @@ namespace nodetool
       this->islimitup=false;
     }
 
-    limit *= 1024;
     epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_up_limit( limit );
-    MINFO("Set limit-up to " << limit/1024 << " kB/s");
+    MINFO("Set limit-up to " << limit << " kB/s");
     return true;
   }
 
@@ -1859,9 +1817,8 @@ namespace nodetool
       limit=default_limit_down;
       this->islimitdown=false;
     }
-    limit *= 1024;
     epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_down_limit( limit );
-    MINFO("Set limit-down to " << limit/1024 << " kB/s");
+    MINFO("Set limit-down to " << limit << " kB/s");
     return true;
   }
 
@@ -1873,21 +1830,21 @@ namespace nodetool
 
     if(limit == -1)
     {
-      limit_up = default_limit_up * 1024;
-      limit_down = default_limit_down * 1024;
+      limit_up = default_limit_up;
+      limit_down = default_limit_down;
     }
     else
     {
-      limit_up = limit * 1024;
-      limit_down = limit * 1024;
+      limit_up = limit;
+      limit_down = limit;
     }
     if(!this->islimitup) {
       epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_up_limit(limit_up);
-      MINFO("Set limit-up to " << limit_up/1024 << " kB/s");
+      MINFO("Set limit-up to " << limit_up << " kB/s");
     }
     if(!this->islimitdown) {
       epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_down_limit(limit_down);
-      MINFO("Set limit-down to " << limit_down/1024 << " kB/s");
+      MINFO("Set limit-down to " << limit_down << " kB/s");
     }
 
     return true;
@@ -1896,8 +1853,8 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::has_too_many_connections(const epee::net_utils::network_address &address)
   {
-    const uint8_t max_connections = 1;
-    uint8_t count = 0;
+    const size_t max_connections = 1;
+    size_t count = 0;
 
     m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
     {

@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -30,7 +29,7 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include "chaingen.h"
-#include "chaingen_tests_list.h"
+#include "block_validation.h"
 
 using namespace epee;
 using namespace cryptonote;
@@ -46,7 +45,7 @@ namespace
     for (size_t i = 0; i < new_block_count; ++i)
     {
       block blk_next;
-      difficulty_type diffic = next_difficulty(timestamps, cummulative_difficulties,DIFFICULTY_TARGET / 2);
+      difficulty_type diffic = next_difficulty(timestamps, cummulative_difficulties,DIFFICULTY_TARGET_V1);
       if (!generator.construct_block_manually(blk_next, blk_prev, miner_account,
         test_generator::bf_timestamp | test_generator::bf_diffic, 0, 0, blk_prev.timestamp, crypto::hash(), diffic))
         return false;
@@ -176,7 +175,7 @@ bool gen_block_invalid_nonce::generate(std::vector<test_event_entry>& events) co
     return false;
 
   // Create invalid nonce
-  difficulty_type diffic = next_difficulty(timestamps, commulative_difficulties,DIFFICULTY_TARGET / 2);
+  difficulty_type diffic = next_difficulty(timestamps, commulative_difficulties,DIFFICULTY_TARGET_V1);
   assert(1 < diffic);
   const block& blk_last = boost::get<block>(events.back());
   uint64_t timestamp = blk_last.timestamp;
@@ -508,7 +507,7 @@ bool gen_block_is_too_big::generate(std::vector<test_event_entry>& events) const
 
   // Creating a huge miner_tx, it will have a lot of outs
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
-  static const size_t tx_out_count = CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE / 3;
+  static const size_t tx_out_count = CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V1 / 2;
   uint64_t amount = get_outs_money_amount(miner_tx);
   uint64_t portion = amount / tx_out_count;
   uint64_t remainder = amount % tx_out_count;
@@ -573,7 +572,7 @@ bool gen_block_invalid_binary_format::generate(std::vector<test_event_entry>& ev
   do
   {
     blk_last = boost::get<block>(events.back());
-    diffic = next_difficulty(timestamps, cummulative_difficulties,DIFFICULTY_TARGET / 2);
+    diffic = next_difficulty(timestamps, cummulative_difficulties,DIFFICULTY_TARGET_V1);
     if (!lift_up_difficulty(events, timestamps, cummulative_difficulties, generator, 1, blk_last, miner_account))
       return false;
     std::cout << "Block #" << events.size() << ", difficulty: " << diffic << std::endl;
@@ -588,7 +587,7 @@ bool gen_block_invalid_binary_format::generate(std::vector<test_event_entry>& ev
   std::vector<crypto::hash> tx_hashes;
   tx_hashes.push_back(get_transaction_hash(tx_0));
   size_t txs_size = get_object_blobsize(tx_0);
-  diffic = next_difficulty(timestamps, cummulative_difficulties,DIFFICULTY_TARGET / 2);
+  diffic = next_difficulty(timestamps, cummulative_difficulties,DIFFICULTY_TARGET_V1);
   if (!generator.construct_block_manually(blk_test, blk_last, miner_account,
     test_generator::bf_diffic | test_generator::bf_timestamp | test_generator::bf_tx_hashes, 0, 0, blk_last.timestamp,
     crypto::hash(), diffic, transaction(), tx_hashes, txs_size))

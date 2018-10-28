@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -43,7 +42,7 @@
 
 using namespace std;
 
-namespace Edollar {
+namespace edollar {
 
 UnsignedTransaction::~UnsignedTransaction() {}
 
@@ -105,9 +104,35 @@ bool UnsignedTransactionImpl::checkLoadedTx(const std::function<size_t()> get_nu
   size_t min_ring_size = ~0;
   std::unordered_map<cryptonote::account_public_address, std::pair<std::string, uint64_t>> dests;
   int first_known_non_zero_change_index = -1;
+  std::string payment_id_string = "";
   for (size_t n = 0; n < get_num_txes(); ++n)
   {
     const tools::wallet2::tx_construction_data &cd = get_tx(n);
+
+    std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+    bool has_encrypted_payment_id = false;
+    crypto::hash8 payment_id8 = crypto::null_hash8;
+    if (cryptonote::parse_tx_extra(cd.extra, tx_extra_fields))
+    {
+      cryptonote::tx_extra_nonce extra_nonce;
+      if (find_tx_extra_field_by_type(tx_extra_fields, extra_nonce))
+      {
+        crypto::hash payment_id;
+        if(cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id8))
+        {
+          if (!payment_id_string.empty())
+            payment_id_string += ", ";
+          payment_id_string = std::string("encrypted payment ID ") + epee::string_tools::pod_to_hex(payment_id8);
+          has_encrypted_payment_id = true;
+        }
+        else if (cryptonote::get_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id))
+        {
+          if (!payment_id_string.empty())
+            payment_id_string += ", ";
+          payment_id_string = std::string("unencrypted payment ID ") + epee::string_tools::pod_to_hex(payment_id);
+        }
+      }
+    }
 
     for (size_t s = 0; s < cd.sources.size(); ++s)
     {
@@ -120,7 +145,13 @@ bool UnsignedTransactionImpl::checkLoadedTx(const std::function<size_t()> get_nu
     {
       const cryptonote::tx_destination_entry &entry = cd.splitted_dsts[d];
       std::string address, standard_address = get_account_address_as_str(m_wallet.testnet(), entry.is_subaddress, entry.addr);
-      address = standard_address;
+      if (has_encrypted_payment_id && !entry.is_subaddress)
+      {
+        address = get_account_integrated_address_as_str(m_wallet.testnet(), entry.addr, payment_id8);
+        address += std::string(" (" + standard_address + " with encrypted payment id " + epee::string_tools::pod_to_hex(payment_id8) + ")");
+      }
+      else
+        address = standard_address;
       auto i = dests.find(entry.addr);
       if (i == dests.end())
         dests.insert(std::make_pair(entry.addr, std::make_pair(address, entry.amount)));
@@ -203,13 +234,13 @@ std::vector<uint64_t> UnsignedTransactionImpl::fee() const
         for (const auto &i: utx.sources) fee += i.amount;
         for (const auto &i: utx.splitted_dsts) fee -= i.amount;
         result.push_back(fee);
-    }   
+    }
     return result;
-} 
+}
 
 std::vector<uint64_t> UnsignedTransactionImpl::mixin() const
 {
-    std::vector<uint64_t> result;    
+    std::vector<uint64_t> result;
     for (const auto &utx: m_unsigned_tx_set.txes) {
         size_t min_mixin = ~0;
         // TODO: Is this loop needed or is sources[0] ?
@@ -221,36 +252,59 @@ std::vector<uint64_t> UnsignedTransactionImpl::mixin() const
         result.push_back(min_mixin);
     }
     return result;
-}    
+}
 
 uint64_t UnsignedTransactionImpl::txCount() const
 {
     return m_unsigned_tx_set.txes.size();
 }
 
-std::vector<std::string> UnsignedTransactionImpl::paymentId() const 
+std::vector<std::string> UnsignedTransactionImpl::paymentId() const
 {
     std::vector<string> result;
-    return result;
-    for (const auto &utx: m_unsigned_tx_set.txes) {     
-      result.push_back("");
+    for (const auto &utx: m_unsigned_tx_set.txes) {
+        crypto::hash payment_id = crypto::null_hash;
+        cryptonote::tx_extra_nonce extra_nonce;
+        std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+        cryptonote::parse_tx_extra(utx.extra, tx_extra_fields);
+        if (cryptonote::find_tx_extra_field_by_type(tx_extra_fields, extra_nonce))
+        {
+          crypto::hash8 payment_id8 = crypto::null_hash8;
+          if(cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id8))
+          {
+              // We can't decrypt short pid without recipient key.
+              memcpy(payment_id.data, payment_id8.data, 8);
+          }
+          else if (!cryptonote::get_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id))
+          {
+            payment_id = crypto::null_hash;
+          }
+        }
+        if(payment_id != crypto::null_hash)
+            result.push_back(epee::string_tools::pod_to_hex(payment_id));
+        else
+            result.push_back("");
     }
     return result;
 }
 
-std::vector<std::string> UnsignedTransactionImpl::recipientAddress() const 
+std::vector<std::string> UnsignedTransactionImpl::recipientAddress() const
 {
     // TODO: return integrated address if short payment ID exists
     std::vector<string> result;
     for (const auto &utx: m_unsigned_tx_set.txes) {
+        if (utx.dests.empty()) {
+          MERROR("empty destinations, skipped");
+          continue;
+        }
         result.push_back(cryptonote::get_account_address_as_str(m_wallet.m_wallet->testnet(), utx.dests[0].is_subaddress, utx.dests[0].addr));
     }
     return result;
 }
 
 uint64_t UnsignedTransactionImpl::minMixinCount() const
-{    
-    uint64_t min_mixin = ~0;  
+{
+    uint64_t min_mixin = ~0;
     for (const auto &utx: m_unsigned_tx_set.txes) {
         for (size_t s = 0; s < utx.sources.size(); ++s) {
             size_t mixin = utx.sources[s].outputs.size() - 1;
@@ -262,6 +316,3 @@ uint64_t UnsignedTransactionImpl::minMixinCount() const
 }
 
 } // namespace
-
-
-

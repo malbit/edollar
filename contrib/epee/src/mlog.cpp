@@ -28,7 +28,11 @@
 #ifndef _MLOG_H_
 #define _MLOG_H_
 
+#include <time.h>
 #include <atomic>
+#include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
+#include "string_tools.h"
 #include "misc_log_ex.h"
 
 #undef EDOLLAR_DEFAULT_LOG_CATEGORY
@@ -55,6 +59,7 @@ static std::string generate_log_filename(const char *base)
     strcpy(tmp, "unknown");
   else
     strftime(tmp, sizeof(tmp), "%Y-%m-%d-%H-%M-%S", &tm);
+  tmp[sizeof(tmp) - 1] = 0;
   filename += "-";
   filename += tmp;
   return filename;

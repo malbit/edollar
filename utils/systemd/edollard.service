@@ -1,18 +1,14 @@
 [Unit]
-Description=Edollar Full Node
+Description=Edollar.cash BlockChain Daemon
 After=network.target
 
 [Service]
-User=edollar
-Group=edollar
-WorkingDirectory=~
-RuntimeDirectory=edollar
-
 Type=forking
 PIDFile=/run/edollar/edollard.pid
-
-ExecStart=/usr/bin/edollard --config-file /etc/edollard.conf \
-    --detach --pidfile /run/edollar/edollard.pid
+ExecStart=/usr/local/src/edollar/build/release/bin/edollard --rpc-bind-ip 127.0.0.1 --rpc-bind-port 31031--detach --pidfile /run/edollar/edollard.pid
+ExecStop=/usr/local/src/edollar/bin/edollard exit
+Restart=always
+User=root
 
 [Install]
 WantedBy=multi-user.target

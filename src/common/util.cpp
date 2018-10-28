@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -35,11 +34,16 @@
 #include <gnu/libc-version.h>
 #endif
 
+#include "unbound.h"
+
 #include "include_base_utils.h"
 #include "file_io_utils.h"
+#include "wipeable_string.h"
 using namespace epee;
 
+#include "crypto/crypto.h"
 #include "util.h"
+#include "memwipe.h"
 #include "cryptonote_config.h"
 #include "net/http_client.h"                        // epee::net_utils::...
 
@@ -53,6 +57,7 @@ using namespace epee;
   #include <sys/stat.h>
 #endif
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
 #include <openssl/sha.h>
 
@@ -406,7 +411,7 @@ namespace tools
 #else
 std::string get_nix_version_display_string()
 {
-  utsname un;
+  struct utsname un;
 
   if(uname(&un) < 0)
     return std::string("*nix: failed to get os version");
@@ -450,8 +455,7 @@ std::string get_nix_version_display_string()
     // namespace fs = boost::filesystem;
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\CRYPTONOTE_NAME
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\CRYPTONOTE_NAME
-    // Mac: ~/Library/Application Support/CRYPTONOTE_NAME
-    // Unix: ~/.CRYPTONOTE_NAME
+    // Unix & Mac: ~/.CRYPTONOTE_NAME
     std::string config_folder;
 
 #ifdef WIN32
@@ -463,14 +467,7 @@ std::string get_nix_version_display_string()
       pathRet = "/";
     else
       pathRet = pszHome;
-#ifdef MAC_OSX
-    // Mac
-    pathRet /= "Library/Application Support";
-    config_folder =  (pathRet + "/" + CRYPTONOTE_NAME);
-#else
-    // Unix
     config_folder = (pathRet + "/." + CRYPTONOTE_NAME);
-#endif
 #endif
 
     return config_folder;
@@ -519,6 +516,18 @@ std::string get_nix_version_display_string()
     return std::error_code(code, std::system_category());
   }
 
+  static bool unbound_built_with_threads()
+  {
+    ub_ctx *ctx = ub_ctx_create();
+    if (!ctx) return false; // cheat a bit, should not happen unless OOM
+    ub_ctx_zone_add(ctx, "monero", "unbound"); // this calls ub_ctx_finalize first, then errors out with UB_SYNTAX
+    // if no threads, bails out early with UB_NOERROR, otherwise fails with UB_AFTERFINAL id already finalized
+    bool with_threads = ub_ctx_async(ctx, 1) != 0; // UB_AFTERFINAL is not defined in public headers, check any error
+    ub_ctx_delete(ctx);
+    MINFO("libunbound was built " << (with_threads ? "with" : "without") << " threads");
+    return with_threads;
+  }
+
   bool sanitize_locale()
   {
     // boost::filesystem throws for "invalid" locales, such as en_US.UTF-8, or kjsdkfs,
@@ -543,6 +552,10 @@ std::string get_nix_version_display_string()
   }
   bool on_startup()
   {
+    wipeable_string::set_wipe(&memwipe);
+
+    mlog_configure("", true);
+
     sanitize_locale();
 
 #ifdef __GLIBC__
@@ -550,6 +563,16 @@ std::string get_nix_version_display_string()
     if (!strcmp(ver, "2.25"))
       MCLOG_RED(el::Level::Warning, "global", "Running with glibc " << ver << ", hangs may occur - change glibc version if possible");
 #endif
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000 || defined(LIBRESSL_VERSION_TEXT)
+    SSL_library_init();
+#else
+    OPENSSL_init_ssl(0, NULL);
+#endif
+
+    if (!unbound_built_with_threads())
+      MCLOG_RED(el::Level::Warning, "global", "libunbound was not built with threads enabled - crashes may occur");
+
     return true;
   }
   void set_strict_default_file_permissions(bool strict)
@@ -622,13 +645,13 @@ std::string get_nix_version_display_string()
   int vercmp(const char *v0, const char *v1)
   {
     std::vector<std::string> f0, f1;
-    boost::split(f0, v0, boost::is_any_of("."));
-    boost::split(f1, v1, boost::is_any_of("."));
-    while (f0.size() < f1.size())
-      f0.push_back("0");
-    while (f1.size() < f0.size())
-      f1.push_back("0");
-    for (size_t i = 0; i < f0.size(); ++i) {
+    boost::split(f0, v0, boost::is_any_of(".-"));
+    boost::split(f1, v1, boost::is_any_of(".-"));
+    for (size_t i = 0; i < std::max(f0.size(), f1.size()); ++i) {
+      if (i >= f0.size())
+        return -1;
+      if (i >= f1.size())
+        return 1;
       int f0i = atoi(f0[i].c_str()), f1i = atoi(f1[i].c_str());
       int n = f0i - f1i;
       if (n)

@@ -1,4 +1,4 @@
-// Copyright (c) 2017, The Monero Project
+// Copyright (c) 2017-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -27,9 +27,8 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "include_base_utils.h"
-#include "common/command_line.h"
 #include "file_io_utils.h"
-#include "cryptonote_protocol/blobdatatype.h"
+#include "cryptonote_basic/blobdatatype.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "wallet/wallet2.h"
@@ -55,16 +54,8 @@ int SignatureFuzzer::init()
 
   try
   {
-    boost::filesystem::remove("/tmp/signature-test.keys");
-    boost::filesystem::remove("/tmp/signature-test.address.txt");
-    boost::filesystem::remove("/tmp/signature-test");
-
     wallet.init("");
-    wallet.generate("/tmp/signature-test", "", spendkey, true, false);
-
-    boost::filesystem::remove("/tmp/signature-test.keys");
-    boost::filesystem::remove("/tmp/signature-test.address.txt");
-    boost::filesystem::remove("/tmp/signature-test");
+    wallet.generate("", "", spendkey, true, false);
 
     cryptonote::address_parse_info info;
     if (!cryptonote::get_account_address_from_str_or_url(info, true, "9uVsvEryzpN8WH2t1WWhFFCG5tS8cBNdmJYNRuckLENFimfauV5pZKeS1P2CbxGkSDTUPHXWwiYE5ZGSXDAGbaZgDxobqDN"))

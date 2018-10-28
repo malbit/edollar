@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -34,6 +33,7 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/portable_binary_oarchive.hpp>
 #include <boost/archive/portable_binary_iarchive.hpp>
+#include <boost/filesystem/operations.hpp>
 
 
 namespace tools

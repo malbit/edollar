@@ -1,22 +1,21 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
-// 
+// Copyright (c) 2017 - 2018, eDollar project (fork from Monero)
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -26,13 +25,17 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include "include_base_utils.h"
 using namespace epee;
 
 #include <atomic>
+#include <boost/algorithm/string.hpp>
+#include "wipeable_string.h"
+#include "string_tools.h"
+#include "serialization/string.h"
 #include "cryptonote_format_utils.h"
 #include "cryptonote_config.h"
 #include "crypto/crypto.h"
@@ -42,28 +45,32 @@ using namespace epee;
 #undef EDOLLAR_DEFAULT_LOG_CATEGORY
 #define EDOLLAR_DEFAULT_LOG_CATEGORY "cn"
 
+#define ENCRYPTED_PAYMENT_ID_TAIL 0x8d
+
 // #define ENABLE_HASH_CASH_INTEGRITY_CHECK
 
+using namespace crypto;
+
 static const uint64_t valid_decomposed_outputs[] = {
-  (uint64_t)1, (uint64_t)2, (uint64_t)3, (uint64_t)4, (uint64_t)5, (uint64_t)6, (uint64_t)7, (uint64_t)8, (uint64_t)9, 
+  (uint64_t)1, (uint64_t)2, (uint64_t)3, (uint64_t)4, (uint64_t)5, (uint64_t)6, (uint64_t)7, (uint64_t)8, (uint64_t)9,
   (uint64_t)10, (uint64_t)20, (uint64_t)30, (uint64_t)40, (uint64_t)50, (uint64_t)60, (uint64_t)70, (uint64_t)80, (uint64_t)90,
   (uint64_t)100, (uint64_t)200, (uint64_t)300, (uint64_t)400, (uint64_t)500, (uint64_t)600, (uint64_t)700, (uint64_t)800, (uint64_t)900,
   (uint64_t)1000, (uint64_t)2000, (uint64_t)3000, (uint64_t)4000, (uint64_t)5000, (uint64_t)6000, (uint64_t)7000, (uint64_t)8000, (uint64_t)9000,
   (uint64_t)10000, (uint64_t)20000, (uint64_t)30000, (uint64_t)40000, (uint64_t)50000, (uint64_t)60000, (uint64_t)70000, (uint64_t)80000, (uint64_t)90000,
   (uint64_t)100000, (uint64_t)200000, (uint64_t)300000, (uint64_t)400000, (uint64_t)500000, (uint64_t)600000, (uint64_t)700000, (uint64_t)800000, (uint64_t)900000,
-  (uint64_t)1000000, (uint64_t)2000000, (uint64_t)3000000, (uint64_t)4000000, (uint64_t)5000000, (uint64_t)6000000, (uint64_t)7000000, (uint64_t)8000000, (uint64_t)9000000, 
+  (uint64_t)1000000, (uint64_t)2000000, (uint64_t)3000000, (uint64_t)4000000, (uint64_t)5000000, (uint64_t)6000000, (uint64_t)7000000, (uint64_t)8000000, (uint64_t)9000000,
   (uint64_t)10000000, (uint64_t)20000000, (uint64_t)30000000, (uint64_t)40000000, (uint64_t)50000000, (uint64_t)60000000, (uint64_t)70000000, (uint64_t)80000000, (uint64_t)90000000,
   (uint64_t)100000000, (uint64_t)200000000, (uint64_t)300000000, (uint64_t)400000000, (uint64_t)500000000, (uint64_t)600000000, (uint64_t)700000000, (uint64_t)800000000, (uint64_t)900000000,
   (uint64_t)1000000000, (uint64_t)2000000000, (uint64_t)3000000000, (uint64_t)4000000000, (uint64_t)5000000000, (uint64_t)6000000000, (uint64_t)7000000000, (uint64_t)8000000000, (uint64_t)9000000000,
   (uint64_t)10000000000, (uint64_t)20000000000, (uint64_t)30000000000, (uint64_t)40000000000, (uint64_t)50000000000, (uint64_t)60000000000, (uint64_t)70000000000, (uint64_t)80000000000, (uint64_t)90000000000,
   (uint64_t)100000000000, (uint64_t)200000000000, (uint64_t)300000000000, (uint64_t)400000000000, (uint64_t)500000000000, (uint64_t)600000000000, (uint64_t)700000000000, (uint64_t)800000000000, (uint64_t)900000000000,
-  (uint64_t)1000000000000, (uint64_t)2000000000000, (uint64_t)3000000000000, (uint64_t)4000000000000, (uint64_t)5000000000000, (uint64_t)6000000000000, (uint64_t)7000000000000, (uint64_t)8000000000000, (uint64_t)9000000000000, 
+  (uint64_t)1000000000000, (uint64_t)2000000000000, (uint64_t)3000000000000, (uint64_t)4000000000000, (uint64_t)5000000000000, (uint64_t)6000000000000, (uint64_t)7000000000000, (uint64_t)8000000000000, (uint64_t)9000000000000,
   (uint64_t)10000000000000, (uint64_t)20000000000000, (uint64_t)30000000000000, (uint64_t)40000000000000, (uint64_t)50000000000000, (uint64_t)60000000000000, (uint64_t)70000000000000, (uint64_t)80000000000000, (uint64_t)90000000000000,
   (uint64_t)100000000000000, (uint64_t)200000000000000, (uint64_t)300000000000000, (uint64_t)400000000000000, (uint64_t)500000000000000, (uint64_t)600000000000000, (uint64_t)700000000000000, (uint64_t)800000000000000, (uint64_t)900000000000000,
   (uint64_t)1000000000000000, (uint64_t)2000000000000000, (uint64_t)3000000000000000, (uint64_t)4000000000000000, (uint64_t)5000000000000000, (uint64_t)6000000000000000, (uint64_t)7000000000000000, (uint64_t)8000000000000000, (uint64_t)9000000000000000,
   (uint64_t)10000000000000000, (uint64_t)20000000000000000, (uint64_t)30000000000000000, (uint64_t)40000000000000000, (uint64_t)50000000000000000, (uint64_t)60000000000000000, (uint64_t)70000000000000000, (uint64_t)80000000000000000, (uint64_t)90000000000000000,
   (uint64_t)100000000000000000, (uint64_t)200000000000000000, (uint64_t)300000000000000000, (uint64_t)400000000000000000, (uint64_t)500000000000000000, (uint64_t)600000000000000000, (uint64_t)700000000000000000, (uint64_t)800000000000000000, (uint64_t)900000000000000000,
-  (uint64_t)1000000000000000000, (uint64_t)2000000000000000000, (uint64_t)3000000000000000000, (uint64_t)4000000000000000000, (uint64_t)5000000000000000000, (uint64_t)6000000000000000000, (uint64_t)7000000000000000000, (uint64_t)8000000000000000000, (uint64_t)9000000000000000000, 
+  (uint64_t)1000000000000000000, (uint64_t)2000000000000000000, (uint64_t)3000000000000000000, (uint64_t)4000000000000000000, (uint64_t)5000000000000000000, (uint64_t)6000000000000000000, (uint64_t)7000000000000000000, (uint64_t)8000000000000000000, (uint64_t)9000000000000000000,
   (uint64_t)10000000000000000000ull
 };
 
@@ -73,6 +80,31 @@ static std::atomic<uint64_t> tx_hashes_calculated_count(0);
 static std::atomic<uint64_t> tx_hashes_cached_count(0);
 static std::atomic<uint64_t> block_hashes_calculated_count(0);
 static std::atomic<uint64_t> block_hashes_cached_count(0);
+
+#define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {MWARNING(message); throw std::runtime_error(message);}}
+
+namespace cryptonote
+{
+  static inline unsigned char *operator &(ec_point &point) {
+    return &reinterpret_cast<unsigned char &>(point);
+  }
+  static inline const unsigned char *operator &(const ec_point &point) {
+    return &reinterpret_cast<const unsigned char &>(point);
+  }
+
+  // a copy of rct::addKeys, since we can't link to libringct to avoid circular dependencies
+  static void add_public_key(crypto::public_key &AB, const crypto::public_key &A, const crypto::public_key &B) {
+      ge_p3 B2, A2;
+      CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&B2, &B) == 0, "ge_frombytes_vartime failed at "+boost::lexical_cast<std::string>(__LINE__));
+      CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&A2, &A) == 0, "ge_frombytes_vartime failed at "+boost::lexical_cast<std::string>(__LINE__));
+      ge_cached tmp2;
+      ge_p3_to_cached(&tmp2, &B2);
+      ge_p1p1 tmp3;
+      ge_add(&tmp3, &A2, &tmp2);
+      ge_p1p1_to_p3(&A2, &tmp3);
+      ge_p3_tobytes(&AB, &A2);
+  }
+}
 
 namespace cryptonote
 {
@@ -176,6 +208,7 @@ namespace cryptonote
       crypto::derive_secret_key(recv_derivation, real_output_index, ack.m_spend_secret_key, scalar_step1); // computes Hs(a*R || idx) + b
 
       // step 2: add Hs(a || index_major || index_minor)
+      crypto::secret_key subaddr_sk;
       crypto::secret_key scalar_step2;
       if (received_index.is_zero())
       {
@@ -183,13 +216,32 @@ namespace cryptonote
       }
       else
       {
-        crypto::secret_key m = get_subaddress_secret_key(ack.m_view_secret_key, received_index);
-        sc_add((unsigned char*)&scalar_step2, (unsigned char*)&scalar_step1, (unsigned char*)&m);
+        subaddr_sk = get_subaddress_secret_key(ack.m_view_secret_key, received_index);
+        sc_add((unsigned char*)&scalar_step2, (unsigned char*)&scalar_step1, (unsigned char*)&subaddr_sk);
       }
 
       in_ephemeral.sec = scalar_step2;
-      crypto::secret_key_to_public_key(in_ephemeral.sec, in_ephemeral.pub);
-      CHECK_AND_ASSERT_MES(in_ephemeral.pub == out_key, false, "key image helper precomp: given output pubkey doesn't match the derived one");
+
+      if (ack.m_multisig_keys.empty())
+      {
+        // when not in multisig, we know the full spend secret key, so the output pubkey can be obtained by scalarmultBase
+        CHECK_AND_ASSERT_MES(crypto::secret_key_to_public_key(in_ephemeral.sec, in_ephemeral.pub), false, "Failed to derive public key");
+      }
+      else
+      {
+        // when in multisig, we only know the partial spend secret key. but we do know the full spend public key, so the output pubkey can be obtained by using the standard CN key derivation
+        CHECK_AND_ASSERT_MES(crypto::derive_public_key(recv_derivation, real_output_index, ack.m_account_address.m_spend_public_key, in_ephemeral.pub), false, "Failed to derive public key");
+        // and don't forget to add the contribution from the subaddress part
+        if (!received_index.is_zero())
+        {
+          crypto::public_key subaddr_pk;
+          CHECK_AND_ASSERT_MES(crypto::secret_key_to_public_key(subaddr_sk, subaddr_pk), false, "Failed to derive public key");
+          add_public_key(in_ephemeral.pub, in_ephemeral.pub, subaddr_pk);
+        }
+      }
+
+      CHECK_AND_ASSERT_MES(in_ephemeral.pub == out_key,
+           false, "key image helper precomp: given output pubkey doesn't match the derived one");
     }
 
     crypto::generate_key_image(in_ephemeral.pub, in_ephemeral.sec, ki);
@@ -243,7 +295,23 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool get_tx_fee(const transaction& tx, uint64_t & fee)
   {
-    fee = tx.rct_signatures.txnFee;
+    if (tx.version > 1)
+    {
+      fee = tx.rct_signatures.txnFee;
+      return true;
+    }
+    uint64_t amount_in = 0;
+    uint64_t amount_out = 0;
+    for(auto& in: tx.vin)
+    {
+      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key), 0, "unexpected type id in transaction");
+      amount_in += boost::get<txin_to_key>(in).amount;
+    }
+    for(auto& o: tx.vout)
+      amount_out += o.amount;
+
+    CHECK_AND_ASSERT_MES(amount_in >= amount_out, false, "transaction spend (" <<amount_in << ") more than it has (" << amount_out << ")");
+    fee = amount_in - amount_out;
     return true;
   }
   //---------------------------------------------------------------
@@ -403,7 +471,66 @@ namespace cryptonote
     std::copy(s.begin(), s.end(), std::back_inserter(tx_extra));
     return true;
   }
+  //---------------------------------------------------------------
+  void set_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash& payment_id)
+  {
+    extra_nonce.clear();
+    extra_nonce.push_back(TX_EXTRA_NONCE_PAYMENT_ID);
+    const uint8_t* payment_id_ptr = reinterpret_cast<const uint8_t*>(&payment_id);
+    std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
+  }
+  //---------------------------------------------------------------
+  void set_encrypted_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash8& payment_id)
+  {
+    extra_nonce.clear();
+    extra_nonce.push_back(TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID);
+    const uint8_t* payment_id_ptr = reinterpret_cast<const uint8_t*>(&payment_id);
+    std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
+  }
+  //---------------------------------------------------------------
+  bool get_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash& payment_id)
+  {
+    if(sizeof(crypto::hash) + 1 != extra_nonce.size())
+      return false;
+    if(TX_EXTRA_NONCE_PAYMENT_ID != extra_nonce[0])
+      return false;
+    payment_id = *reinterpret_cast<const crypto::hash*>(extra_nonce.data() + 1);
+    return true;
+  }
+  //---------------------------------------------------------------
+  bool get_encrypted_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash8& payment_id)
+  {
+    if(sizeof(crypto::hash8) + 1 != extra_nonce.size())
+      return false;
+    if (TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID != extra_nonce[0])
+      return false;
+    payment_id = *reinterpret_cast<const crypto::hash8*>(extra_nonce.data() + 1);
+    return true;
+  }
+  //---------------------------------------------------------------
+  bool encrypt_payment_id(crypto::hash8 &payment_id, const crypto::public_key &public_key, const crypto::secret_key &secret_key)
+  {
+    crypto::key_derivation derivation;
+    crypto::hash hash;
+    char data[33]; /* A hash, and an extra byte */
 
+    if (!generate_key_derivation(public_key, secret_key, derivation))
+      return false;
+
+    memcpy(data, &derivation, 32);
+    data[32] = ENCRYPTED_PAYMENT_ID_TAIL;
+    cn_fast_hash(data, 33, hash);
+
+    for (size_t b = 0; b < 8; ++b)
+      payment_id.data[b] ^= hash.data[b];
+
+    return true;
+  }
+  bool decrypt_payment_id(crypto::hash8 &payment_id, const crypto::public_key &public_key, const crypto::secret_key &secret_key)
+  {
+    // Encryption and decryption are the same operation (xor with a key)
+    return encrypt_payment_id(payment_id, public_key, secret_key);
+  }
   //---------------------------------------------------------------
   bool get_inputs_money_amount(const transaction& tx, uint64_t& money)
   {
@@ -442,6 +569,11 @@ namespace cryptonote
       CHECK_AND_ASSERT_MES(out.target.type() == typeid(txout_to_key), false, "wrong variant type: "
         << out.target.type().name() << ", expected " << typeid(txout_to_key).name()
         << ", in transaction id=" << get_transaction_hash(tx));
+
+      if (tx.version == 1)
+      {
+        CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
+      }
 
       if(!check_key(boost::get<txout_to_key>(out.target).key))
         return false;
@@ -499,17 +631,21 @@ namespace cryptonote
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::public_key& tx_pub_key, const std::vector<crypto::public_key>& additional_tx_pub_keys, size_t output_index)
   {
     crypto::key_derivation derivation;
-    generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    bool r = generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "Failed to generate key derivation");
     crypto::public_key pk;
-    derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    r = derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    CHECK_AND_ASSERT_MES(r, false, "Failed to derive public key");
     if (pk == out_key.key)
       return true;
     // try additional tx pubkeys if available
     if (!additional_tx_pub_keys.empty())
     {
       CHECK_AND_ASSERT_MES(output_index < additional_tx_pub_keys.size(), false, "wrong number of additional tx pubkeys");
-      generate_key_derivation(additional_tx_pub_keys[output_index], acc.m_view_secret_key, derivation);
-      derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+      r = generate_key_derivation(additional_tx_pub_keys[output_index], acc.m_view_secret_key, derivation);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to generate key derivation");
+      r = derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to derive public key");
       return pk == out_key.key;
     }
     return false;
@@ -596,11 +732,11 @@ namespace cryptonote
       case 9:
         return "edollar";
       case 6:
-        return "milledollar";
+        return "millidollar";
       case 3:
-        return "micredollar";
-      case 0:
-        return "nanedollar";
+        return "microdollar";
+      case 3:
+        return "nanodollar";
       default:
         ASSERT_MES_AND_THROW("Invalid decimal point specification: " << default_decimal_point);
     }
@@ -641,6 +777,13 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool calculate_transaction_hash(const transaction& t, crypto::hash& res, size_t* blob_size)
   {
+    // v1 transactions hash the entire blob
+    if (t.version == 1)
+    {
+      size_t ignored_blob_size, &blob_size_ref = blob_size ? *blob_size : ignored_blob_size;
+      return get_object_hash(t, res, blob_size_ref);
+    }
+
     // v2 transactions hash different parts together, than hash the set of those hashes
     crypto::hash hashes[3];
 
@@ -737,7 +880,8 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool calculate_block_hash(const block& b, crypto::hash& res)
   {
-    return get_object_hash(get_block_hashing_blob(b), res);
+    bool hash_result = get_object_hash(get_block_hashing_blob(b), res);
+    return hash_result;
   }
   //---------------------------------------------------------------
   bool get_block_hash(const block& b, crypto::hash& res)
@@ -770,7 +914,15 @@ namespace cryptonote
   bool get_block_longhash(const block& b, crypto::hash& res, uint64_t height)
   {
     blobdata bd = get_block_hashing_blob(b);
-    crypto::cn_slow_hash(bd.data(), bd.size(), res);
+    const int cn_variant;
+
+    if(b.major_version >= 2) {
+      cn_variant = 1;
+    } else {
+      cn_variant = 0;
+  	}
+
+    crypto::cn_slow_hash(bd.data(), bd.size(), res, cn_variant);
     return true;
   }
   //---------------------------------------------------------------
@@ -872,7 +1024,7 @@ namespace cryptonote
     block_hashes_cached = block_hashes_cached_count;
   }
   //---------------------------------------------------------------
-  crypto::secret_key encrypt_key(const crypto::secret_key &key, const std::string &passphrase)
+  crypto::secret_key encrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase)
   {
     crypto::hash hash;
     crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash);
@@ -880,7 +1032,7 @@ namespace cryptonote
     return key;
   }
   //---------------------------------------------------------------
-  crypto::secret_key decrypt_key(const crypto::secret_key &key, const std::string &passphrase)
+  crypto::secret_key decrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase)
   {
     crypto::hash hash;
     crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash);

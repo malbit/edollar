@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -174,7 +173,7 @@ bool t_command_parser_executor::print_block(const std::vector<std::string>& args
     uint64_t height = boost::lexical_cast<uint64_t>(arg);
     return m_executor.print_block_by_height(height);
   }
-  catch (boost::bad_lexical_cast&)
+  catch (const boost::bad_lexical_cast&)
   {
     crypto::hash block_hash;
     if (parse_hash256(arg, block_hash))
@@ -294,6 +293,11 @@ bool t_command_parser_executor::start_mining(const std::vector<std::string>& arg
     {
       testnet = true;
     }
+  }
+  if (info.is_subaddress)
+  {
+    tools::fail_msg_writer() << "subaddress for mining reward is not yet supported!" << std::endl;
+    return true;
   }
   if(testnet)
     std::cout << "Mining to a testnet address, make sure this is intentional!" << std::endl;
@@ -416,7 +420,7 @@ bool t_command_parser_executor::out_peers(const std::vector<std::string>& args)
 		limit = std::stoi(args[0]);
 	}
 	  
-	catch(std::exception& ex) {
+	catch(const std::exception& ex) {
 		_erro("stoi exception");
 		return false;
 	}
@@ -446,7 +450,7 @@ bool t_command_parser_executor::hard_fork_info(const std::vector<std::string>& a
     try {
       version = std::stoi(args[0]);
     }
-    catch(std::exception& ex) {
+    catch(const std::exception& ex) {
         return false;
     }
     if (version <= 0 || version > 255)

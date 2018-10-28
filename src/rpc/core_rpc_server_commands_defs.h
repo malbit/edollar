@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -50,7 +49,7 @@ namespace cryptonote
 // advance which version they will stop working with
 // Don't go over 32767 for any of these
 #define CORE_RPC_VERSION_MAJOR 1
-#define CORE_RPC_VERSION_MINOR 15
+#define CORE_RPC_VERSION_MINOR 17
 #define MAKE_CORE_RPC_VERSION(major,minor) (((major)<<16)|(minor))
 #define CORE_RPC_VERSION MAKE_CORE_RPC_VERSION(CORE_RPC_VERSION_MAJOR, CORE_RPC_VERSION_MINOR)
 
@@ -236,6 +235,7 @@ namespace cryptonote
         uint64_t unlock_time;
         uint64_t height;
         std::list<spent_output> spent_outputs;
+        std::string payment_id;
         bool coinbase;
         bool mempool;
         uint32_t mixin;
@@ -249,6 +249,7 @@ namespace cryptonote
           KV_SERIALIZE(unlock_time)
           KV_SERIALIZE(height)
           KV_SERIALIZE(spent_outputs)
+          KV_SERIALIZE(payment_id)
           KV_SERIALIZE(coinbase)
           KV_SERIALIZE(mempool)
           KV_SERIALIZE(mixin)
@@ -528,6 +529,7 @@ namespace cryptonote
       
       struct response
       {
+        std::string payment_id;
         uint64_t import_fee;
         bool new_request;
         bool request_fulfilled;
@@ -535,6 +537,7 @@ namespace cryptonote
         std::string status;
         
         BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(payment_id)
           KV_SERIALIZE(import_fee)
           KV_SERIALIZE(new_request)
           KV_SERIALIZE(request_fulfilled)
@@ -563,6 +566,7 @@ namespace cryptonote
       std::string as_hex;
       std::string as_json;
       bool in_pool;
+      bool double_spend_seen;
       uint64_t block_height;
       uint64_t block_timestamp;
       std::vector<uint64_t> output_indices;
@@ -572,6 +576,7 @@ namespace cryptonote
         KV_SERIALIZE(as_hex)
         KV_SERIALIZE(as_json)
         KV_SERIALIZE(in_pool)
+        KV_SERIALIZE(double_spend_seen)
         KV_SERIALIZE(block_height)
         KV_SERIALIZE(block_timestamp)
         KV_SERIALIZE(output_indices)
@@ -914,6 +919,7 @@ namespace cryptonote
       uint64_t alt_blocks_count;
       uint64_t outgoing_connections_count;
       uint64_t incoming_connections_count;
+      uint64_t rpc_connections_count;
       uint64_t white_peerlist_size;
       uint64_t grey_peerlist_size;
       bool testnet;
@@ -921,6 +927,8 @@ namespace cryptonote
       uint64_t cumulative_difficulty;
       uint64_t block_size_limit;
       uint64_t start_time;
+      uint64_t free_space;
+      bool offline;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)
@@ -933,6 +941,7 @@ namespace cryptonote
         KV_SERIALIZE(alt_blocks_count)
         KV_SERIALIZE(outgoing_connections_count)
         KV_SERIALIZE(incoming_connections_count)
+        KV_SERIALIZE(rpc_connections_count)
         KV_SERIALIZE(white_peerlist_size)
         KV_SERIALIZE(grey_peerlist_size)
         KV_SERIALIZE(testnet)
@@ -940,6 +949,8 @@ namespace cryptonote
         KV_SERIALIZE(cumulative_difficulty)
         KV_SERIALIZE(block_size_limit)
         KV_SERIALIZE(start_time)
+        KV_SERIALIZE(free_space)
+        KV_SERIALIZE(offline)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1214,12 +1225,14 @@ namespace cryptonote
     {
       std::string status;
       block_header_response block_header;
+      std::string miner_tx_hash;
       std::vector<std::string> tx_hashes;
       std::string blob;
       std::string json;
       
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(block_header)
+        KV_SERIALIZE(miner_tx_hash)
         KV_SERIALIZE(tx_hashes)
         KV_SERIALIZE(status)
         KV_SERIALIZE(blob)
@@ -1354,6 +1367,8 @@ namespace cryptonote
     bool relayed;
     uint64_t last_relayed_time;
     bool do_not_relay;
+    bool double_spend_seen;
+    std::string tx_blob;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(id_hash)
@@ -1369,6 +1384,8 @@ namespace cryptonote
       KV_SERIALIZE(relayed)
       KV_SERIALIZE(last_relayed_time)
       KV_SERIALIZE(do_not_relay)
+      KV_SERIALIZE(double_spend_seen)
+      KV_SERIALIZE(tx_blob)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1477,6 +1494,7 @@ namespace cryptonote
     uint32_t num_not_relayed;
     uint64_t histo_98pc;
     std::vector<txpool_histo> histo;
+    uint32_t num_double_spends;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(bytes_total)
@@ -1491,6 +1509,7 @@ namespace cryptonote
       KV_SERIALIZE(num_not_relayed)
       KV_SERIALIZE(histo_98pc)
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(histo)
+      KV_SERIALIZE(num_double_spends)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1634,8 +1653,8 @@ namespace cryptonote
     struct response
     {
       std::string status;
-      uint64_t limit_up;
-      uint64_t limit_down;
+      int64_t limit_up;
+      int64_t limit_down;
       
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)
@@ -2060,7 +2079,7 @@ namespace cryptonote
     {
       uint64_t start_block_height;
       uint64_t nblocks;
-      boost::uuids::uuid connection_id;
+      std::string connection_id;
       uint32_t rate;
       uint32_t speed;
       uint64_t size;
@@ -2069,7 +2088,7 @@ namespace cryptonote
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(start_block_height)
         KV_SERIALIZE(nblocks)
-        KV_SERIALIZE_VAL_POD_AS_BLOB(connection_id)
+        KV_SERIALIZE(connection_id)
         KV_SERIALIZE(rate)
         KV_SERIALIZE(speed)
         KV_SERIALIZE(size)

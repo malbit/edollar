@@ -1,5 +1,5 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2017-2018, The eDollar Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -35,13 +35,24 @@
 #include "include_base_utils.h"
 #include <random>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/algorithm/string/join.hpp>
 using namespace epee;
 namespace bf = boost::filesystem;
 
 #undef EDOLLAR_DEFAULT_LOG_CATEGORY
 #define EDOLLAR_DEFAULT_LOG_CATEGORY "net.dns"
 
-#define DEFAULT_DNS_PUBLIC_ADDR "8.8.4.4"
+static const char *DEFAULT_DNS_PUBLIC_ADDR[] =
+{
+  "1.1.1.1",    				// Cloudflare
+  "8.8.8.8",         			// Google
+  "64.6.64.6",      		 // Verisign
+  "209.244.0.3",      		 // Level3
+  "8.26.56.26",   			// Comodo
+  "77.88.8.8",				// Yandex
+};
 
 static boost::mutex instance_lock;
 
@@ -88,11 +99,16 @@ get_builtin_cert(void)
 */
 
 /** return the built in root DS trust anchor */
-static const char*
+static const char* const*
 get_builtin_ds(void)
 {
-  return
-". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5\n";
+  static const char * const ds[] =
+  {
+    ". IN DS 19036 8 2 49AAC11D7B6F6446702E54A1607371607A1A41855200FD2CE1CDDE32F24E8FB5\n",
+    ". IN DS 20326 8 2 E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D\n",
+    NULL
+  };
+  return ds;
 }
 
 /************************************************************
@@ -200,13 +216,13 @@ public:
 DNSResolver::DNSResolver() : m_data(new DNSResolverData())
 {
   int use_dns_public = 0;
-  std::string dns_public_addr = DEFAULT_DNS_PUBLIC_ADDR;
+  std::vector<std::string> dns_public_addr;
   if (auto res = getenv("DNS_PUBLIC"))
   {
     dns_public_addr = tools::dns_utils::parse_dns_public(res);
     if (!dns_public_addr.empty())
     {
-      MGINFO("Using public DNS server: " << dns_public_addr << " (TCP)");
+      MGINFO("Using public DNS server(s): " << boost::join(dns_public_addr, ", ") << " (TCP)");
       use_dns_public = 1;
     }
     else
@@ -220,7 +236,8 @@ DNSResolver::DNSResolver() : m_data(new DNSResolverData())
 
   if (use_dns_public)
   {
-    ub_ctx_set_fwd(m_data->m_ub_context, dns_public_addr.c_str());
+    for (const auto &ip: dns_public_addr)
+      ub_ctx_set_fwd(m_data->m_ub_context, string_copy(ip.c_str()));
     ub_ctx_set_option(m_data->m_ub_context, string_copy("do-udp:"), string_copy("no"));
     ub_ctx_set_option(m_data->m_ub_context, string_copy("do-tcp:"), string_copy("yes"));
   }
@@ -230,7 +247,12 @@ DNSResolver::DNSResolver() : m_data(new DNSResolverData())
     ub_ctx_hosts(m_data->m_ub_context, NULL);
   }
 
-  ub_ctx_add_ta(m_data->m_ub_context, string_copy(::get_builtin_ds()));
+  const char * const *ds = ::get_builtin_ds();
+  while (*ds)
+  {
+    MINFO("adding trust anchor: " << *ds);
+    ub_ctx_add_ta(m_data->m_ub_context, string_copy(*ds++));
+  }
 }
 
 DNSResolver::~DNSResolver()
@@ -334,8 +356,8 @@ namespace dns_utils
 // TODO: parse the string in a less stupid way, probably with regex
 std::string address_from_txt_record(const std::string& s)
 {
-  // make sure the txt record has "oa1:edc" and find it
-  auto pos = s.find("oa1:edc");
+  // make sure the txt record has "oa1:xmr" and find it
+  auto pos = s.find("oa1:edl");
   if (pos == std::string::npos)
     return {};
   // search from there to find "recipient_address="
@@ -360,18 +382,18 @@ std::string address_from_txt_record(const std::string& s)
   return {};
 }
 /**
- * @brief gets a edollar address from the TXT record of a DNS entry
+ * @brief gets a monero address from the TXT record of a DNS entry
  *
- * gets edollard address from the TXT record of the DNS entry associated
+ * gets the monero address from the TXT record of the DNS entry associated
  * with <url>.  If this lookup fails, or the TXT record does not contain an
- * EDC address in the correct format, returns an empty string.  <dnssec_valid>
+ * XMR address in the correct format, returns an empty string.  <dnssec_valid>
  * will be set true or false according to whether or not the DNS query passes
  * DNSSEC validation.
  *
  * @param url the url to look up
  * @param dnssec_valid return-by-reference for DNSSEC status of query
  *
- * @return a edollar address (as a string) or an empty string
+ * @return a monero address (as a string) or an empty string
  */
 std::vector<std::string> addresses_from_url(const std::string& url, bool& dnssec_valid)
 {
@@ -388,7 +410,7 @@ std::vector<std::string> addresses_from_url(const std::string& url, bool& dnssec
   }
   else dnssec_valid = false;
 
-  // for each txt record, try to find a edollar address in it.
+  // for each txt record, try to find a monero address in it.
   for (auto& rec : records)
   {
     std::string addr = address_from_txt_record(rec);
@@ -455,7 +477,7 @@ bool load_txt_records_from_dns(std::vector<std::string> &good_records, const std
   for (size_t n = 0; n < dns_urls.size(); ++n)
   {
     threads[n] = boost::thread([n, dns_urls, &records, &avail, &valid](){
-      records[n] = tools::DNSResolver::instance().get_txt_record(dns_urls[n], avail[n], valid[n]); 
+      records[n] = tools::DNSResolver::instance().get_txt_record(dns_urls[n], avail[n], valid[n]);
     });
   }
   for (size_t n = 0; n < dns_urls.size(); ++n)
@@ -495,7 +517,7 @@ bool load_txt_records_from_dns(std::vector<std::string> &good_records, const std
 
   if (num_valid_records < 2)
   {
-    LOG_PRINT_L1("WARNING: no two valid Edollar DNS checkpoint records were received");
+    LOG_PRINT_L0("WARNING: no two valid eDollar DNS checkpoint records were received");
     return false;
   }
 
@@ -517,7 +539,7 @@ bool load_txt_records_from_dns(std::vector<std::string> &good_records, const std
 
   if (good_records_index < 0)
   {
-    LOG_PRINT_L1("WARNING: no two Edollar DNS checkpoint records matched");
+    LOG_PRINT_L0("WARNING: no two eDollar DNS checkpoint records matched");
     return false;
   }
 
@@ -525,15 +547,16 @@ bool load_txt_records_from_dns(std::vector<std::string> &good_records, const std
   return true;
 }
 
-std::string parse_dns_public(const char *s)
+std::vector<std::string> parse_dns_public(const char *s)
 {
   unsigned ip0, ip1, ip2, ip3;
   char c;
-  std::string dns_public_addr;
+  std::vector<std::string> dns_public_addr;
   if (!strcmp(s, "tcp"))
   {
-    dns_public_addr = DEFAULT_DNS_PUBLIC_ADDR;
-    LOG_PRINT_L0("Using default public DNS server: " << dns_public_addr << " (TCP)");
+    for (size_t i = 0; i < sizeof(DEFAULT_DNS_PUBLIC_ADDR) / sizeof(DEFAULT_DNS_PUBLIC_ADDR[0]); ++i)
+      dns_public_addr.push_back(DEFAULT_DNS_PUBLIC_ADDR[i]);
+    LOG_PRINT_L0("Using default public DNS server(s): " << boost::join(dns_public_addr, ", ") << " (TCP)");
   }
   else if (sscanf(s, "tcp://%u.%u.%u.%u%c", &ip0, &ip1, &ip2, &ip3, &c) == 4)
   {
@@ -543,7 +566,7 @@ std::string parse_dns_public(const char *s)
     }
     else
     {
-      dns_public_addr = std::string(s + strlen("tcp://"));
+      dns_public_addr.push_back(std::string(s + strlen("tcp://")));
     }
   }
   else

@@ -35,7 +35,7 @@ using namespace epee;
 #include "cryptonote_basic_impl.h"
 #include "string_tools.h"
 #include "serialization/binary_utils.h"
-#include "serialization/vector.h"
+#include "serialization/container.h"
 #include "cryptonote_format_utils.h"
 #include "cryptonote_config.h"
 #include "misc_language.h"
@@ -48,6 +48,21 @@ using namespace epee;
 #define EDOLLAR_DEFAULT_LOG_CATEGORY "cn"
 
 namespace cryptonote {
+
+  struct integrated_address {
+    account_public_address adr;
+    crypto::hash8 payment_id;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(adr)
+      FIELD(payment_id)
+    END_SERIALIZE()
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(adr)
+      KV_SERIALIZE(payment_id)
+    END_KV_SERIALIZE_MAP()
+  };
 
   /************************************************************************/
   /* Cryptonote helper functions                                          */
@@ -69,17 +84,24 @@ namespace cryptonote {
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint8_t version) {
-    static_assert(DIFFICULTY_TARGET%60==0,"difficulty targets must be a multiple of 60");
+    static_assert(DIFFICULTY_TARGET % 60 == 0, "difficulty targets must be a multiple of 60");
+    const int target_minutes = DIFFICULTY_TARGET / 60;
     const int emission_speed_factor = EMISSION_SPEED_FACTOR_PER_MINUTE;
+    const int emission_speed_factor_2 = EMISSION_SPEED_FACTOR_PER_MINUTE - (target_minutes-3);
+
     uint64_t base_reward = (MONEY_SUPPLY - already_generated_coins) >> emission_speed_factor;
+    uint64_t base_reward_2 = (MONEY_SUPPLY - already_generated_coins) >> emission_speed_factor_2;
+
     if (base_reward < FINAL_SUBSIDY_PER_MINUTE){
       if (MONEY_SUPPLY > already_generated_coins){
         base_reward = FINAL_SUBSIDY_PER_MINUTE;
-      }
-      else{
+      } else {
         base_reward = FINAL_SUBSIDY_PER_MINUTE/2;
       }
     }
+
+    if (version >= 2)
+      base_reward = base_reward_2
 
     uint64_t full_reward_zone = get_min_block_size(version);
 
@@ -128,7 +150,16 @@ namespace cryptonote {
 
     return summ;
   }
+  //------------------------------------------------------------------------------------
+  uint8_t get_account_integrated_address_checksum(const public_integrated_address_outer_blob& bl)
+  {
+    const unsigned char* pbuf = reinterpret_cast<const unsigned char*>(&bl);
+    uint8_t summ = 0;
+    for(size_t i = 0; i!= sizeof(public_integrated_address_outer_blob)-1; i++)
+      summ += pbuf[i];
 
+    return summ;
+  }
   //-----------------------------------------------------------------------
   std::string get_account_address_as_str(
       bool testnet
@@ -142,7 +173,20 @@ namespace cryptonote {
 
     return tools::base58::encode_addr(address_prefix, t_serializable_object_to_blob(adr));
   }
+  //-----------------------------------------------------------------------
+  std::string get_account_integrated_address_as_str(
+      bool testnet
+    , account_public_address const & adr
+    , crypto::hash8 const & payment_id
+    )
+  {
+    uint64_t integrated_address_prefix = testnet ? config::testnet::CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX : config::CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
 
+    integrated_address iadr = {
+      adr, payment_id
+    };
+    return tools::base58::encode_addr(integrated_address_prefix, t_serializable_object_to_blob(iadr));
+  }
   //-----------------------------------------------------------------------
   bool is_coinbase(const transaction& tx)
   {
@@ -163,6 +207,8 @@ namespace cryptonote {
   {
     uint64_t address_prefix = testnet ?
       config::testnet::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX : config::CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX;
+    uint64_t integrated_address_prefix = testnet ?
+      config::testnet::CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX : config::CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
     uint64_t subaddress_prefix = testnet ?
       config::testnet::CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX : config::CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX;
 
@@ -176,24 +222,46 @@ namespace cryptonote {
         return false;
       }
 
-      if (address_prefix == prefix)
+      if (integrated_address_prefix == prefix)
       {
         info.is_subaddress = false;
+        info.has_payment_id = true;
+      }
+      else if (address_prefix == prefix)
+      {
+        info.is_subaddress = false;
+        info.has_payment_id = false;
       }
       else if (subaddress_prefix == prefix)
       {
         info.is_subaddress = true;
+        info.has_payment_id = false;
       }
       else {
-        LOG_PRINT_L1("Wrong address prefix: " << prefix << ", expected " << address_prefix 
+        LOG_PRINT_L1("Wrong address prefix: " << prefix << ", expected " << address_prefix
+          << " or " << integrated_address_prefix
           << " or " << subaddress_prefix);
         return false;
       }
 
-      if (!::serialization::parse_binary(data, info.address))
+      if (info.has_payment_id)
       {
-        LOG_PRINT_L1("Account public address keys can't be parsed");
-        return false;
+        integrated_address iadr;
+        if (!::serialization::parse_binary(data, iadr))
+        {
+          LOG_PRINT_L1("Account public address keys can't be parsed");
+          return false;
+        }
+        info.address = iadr.adr;
+        info.payment_id = iadr.payment_id;
+      }
+      else
+      {
+        if (!::serialization::parse_binary(data, info.address))
+        {
+          LOG_PRINT_L1("Account public address keys can't be parsed");
+          return false;
+        }
       }
 
       if (!crypto::check_key(info.address.m_spend_public_key) || !crypto::check_key(info.address.m_view_public_key))
@@ -233,6 +301,7 @@ namespace cryptonote {
       //we success
       info.address = blob.m_address;
       info.is_subaddress = false;
+      info.has_payment_id = false;
     }
 
     return true;

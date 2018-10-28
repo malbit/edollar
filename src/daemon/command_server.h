@@ -1,6 +1,15 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+/**
+@file
+@details
 
+
+Passing RPC commands:
+
+@image html images/other/runtime-commands.png
+
+*/
+
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -64,6 +73,7 @@ private:
   bool help(const std::vector<std::string>& args);
 
   std::string get_commands_str();
+  std::string get_command_usage(const std::vector<std::string> &args);
 };
 
 } // namespace daemonize

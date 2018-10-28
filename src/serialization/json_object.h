@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017, The Monero Project
+// Copyright (c) 2016-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "string_tools.h"
 #include "rapidjson/document.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "rpc/message_data_structs.h"
@@ -273,6 +274,9 @@ void fromJsonValue(const rapidjson::Value& val, rct::rctSigPrunable& sig);
 
 void toJsonValue(rapidjson::Document& doc, const rct::rangeSig& sig, rapidjson::Value& val);
 void fromJsonValue(const rapidjson::Value& val, rct::rangeSig& sig);
+
+void toJsonValue(rapidjson::Document& doc, const rct::Bulletproof& p, rapidjson::Value& val);
+void fromJsonValue(const rapidjson::Value& val, rct::Bulletproof& p);
 
 void toJsonValue(rapidjson::Document& doc, const rct::boroSig& sig, rapidjson::Value& val);
 void fromJsonValue(const rapidjson::Value& val, rct::boroSig& sig);

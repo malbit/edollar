@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c)  2017, edollar project (fork from Monero)
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without modification, are
@@ -29,7 +28,7 @@
 #include <db_cxx.h>
 
 #include "blockchain_db/blockchain_db.h"
-#include "cryptonote_protocol/blobdatatype.h" // for type blobdata
+#include "cryptonote_basic/blobdatatype.h" // for type blobdata
 
 #include <unordered_map>
 #include <condition_variable>

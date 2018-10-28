@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2017-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -32,7 +31,7 @@
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/blockchain.h"
 #include "p2p/p2p_protocol_defs.h"
-#include "p2p/connection_basic.hpp"
+#include "net/connection_basic.hpp"
 #include "p2p/net_peerlist.h"
 #include "p2p/net_node.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
@@ -52,7 +51,7 @@ class size_logger
 public:
   ~size_logger()
   {
-    for (const auto i: types)
+    for (const auto &i: types)
       std::cout << std::to_string(i.first) << "\t" << i.second << std::endl;
   }
   void add(const char *type, size_t size) { types.insert(std::make_pair(size, type)); }
@@ -105,12 +104,12 @@ int main(int argc, char* argv[])
   SL(tools::wallet2::unsigned_tx_set);
   SL(tools::wallet2::signed_tx_set);
 
-  SL(Edollar::WalletImpl);
-  SL(Edollar::AddressBookRow);
-  SL(Edollar::TransactionInfoImpl);
-  SL(Edollar::TransactionHistoryImpl);
-  SL(Edollar::PendingTransactionImpl);
-  SL(Edollar::UnsignedTransactionImpl);
+  SL(Monero::WalletImpl);
+  SL(Monero::AddressBookRow);
+  SL(Monero::TransactionInfoImpl);
+  SL(Monero::TransactionHistoryImpl);
+  SL(Monero::PendingTransactionImpl);
+  SL(Monero::UnsignedTransactionImpl);
 
   return 0;
 }

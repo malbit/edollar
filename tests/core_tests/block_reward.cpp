@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -30,8 +29,6 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include "chaingen.h"
-#include "chaingen_tests_list.h"
-
 #include "block_reward.h"
 
 using namespace epee;
@@ -81,7 +78,7 @@ namespace
     generator.get_last_n_block_sizes(block_sizes, get_block_hash(blk_prev), median_block_count);
 
     size_t median = misc_utils::median(block_sizes);
-    median = std::max(median, static_cast<size_t>(CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE * 2 / 3));
+    median = std::max(median, static_cast<size_t>(CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V1));
 
     transaction miner_tx;
     bool r = construct_miner_tx_by_size(miner_tx, get_block_height(blk_prev) + 1, generator.get_already_generated_coins(blk_prev),

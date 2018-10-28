@@ -28,26 +28,7 @@
 #ifndef _MISC_LOG_EX_H_
 #define _MISC_LOG_EX_H_
 
-#include "static_initializer.h"
-#include "string_tools.h"
-#include "time_helper.h"
-#include "misc_os_dependent.h"
-
-#include "syncobj.h"
-
-#include <iostream>
-#include <sstream>
-#include <iomanip>
-#include <fstream>
-#include <algorithm>
-#include <list>
-#include <map>
 #include <string>
-#include <time.h>
-#include <boost/cstdint.hpp>
-#include <boost/thread.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
 
 #include "easylogging++.h"
 
@@ -169,7 +150,7 @@ namespace debug
 
 
 #define ASSERT_MES_AND_THROW(message) {LOG_ERROR(message); std::stringstream ss; ss << message; throw std::runtime_error(ss.str());}
-#define CHECK_AND_ASSERT_THROW_MES(expr, message) {if(!(expr)) ASSERT_MES_AND_THROW(message);}
+#define CHECK_AND_ASSERT_THROW_MES(expr, message) do {if(!(expr)) ASSERT_MES_AND_THROW(message);} while(0)
 
 
 #ifndef CHECK_AND_ASSERT

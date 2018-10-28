@@ -1,4 +1,4 @@
-// Copyright (c) 2017, The Monero Project
+// Copyright (c) 2017-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -34,12 +34,14 @@
 #include "cryptonote_config.h"
 #include "common/util.h"
 
+static __thread int depth = 0;
+
 namespace tools
 {
 threadpool::threadpool() : running(true), active(0) {
   boost::thread::attributes attrs;
   attrs.set_stack_size(THREAD_STACK_SIZE);
-  max = tools::get_max_concurrency() * 2;
+  max = tools::get_max_concurrency();
   size_t i = max;
   while(i--) {
     threads.push_back(boost::thread(attrs, boost::bind(&threadpool::run, this)));
@@ -60,11 +62,13 @@ threadpool::~threadpool() {
 void threadpool::submit(waiter *obj, std::function<void()> f) {
   entry e = {obj, f};
   boost::unique_lock<boost::mutex> lock(mutex);
-  if (active == max && !queue.empty()) {
+  if ((active == max && !queue.empty()) || depth > 0) {
     // if all available threads are already running
     // and there's work waiting, just run in current thread
     lock.unlock();
+    ++depth;
     f();
+    --depth;
   } else {
     if (obj)
       obj->inc();
@@ -74,7 +78,7 @@ void threadpool::submit(waiter *obj, std::function<void()> f) {
 }
 
 int threadpool::get_max_concurrency() {
-  return max / 2;
+  return max;
 }
 
 void threadpool::waiter::wait() {
@@ -106,7 +110,9 @@ void threadpool::run() {
     e = queue.front();
     queue.pop_front();
     lock.unlock();
+    ++depth;
     e.f();
+    --depth;
 
     if (e.wo)
       e.wo->dec();

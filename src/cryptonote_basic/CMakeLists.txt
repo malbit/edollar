@@ -1,4 +1,4 @@
-# Copyright (c)  2017, edollar project (fork from Monero)
+# Copyright (c) 2014-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -57,9 +57,9 @@ set(cryptonote_basic_private_headers
   tx_extra.h
   verification_context.h)
 
-edollar_private_headers(cryptonote_basic
+monero_private_headers(cryptonote_basic
   ${cryptonote_basic_private_headers})
-edollar_add_library(cryptonote_basic
+monero_add_library(cryptonote_basic
   ${cryptonote_basic_sources}
   ${cryptonote_basic_headers}
   ${cryptonote_basic_private_headers})

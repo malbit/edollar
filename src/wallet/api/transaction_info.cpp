@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -34,7 +33,7 @@
 
 using namespace std;
 
-namespace Edollar {
+namespace edollar {
 
 TransactionInfo::~TransactionInfo() {}
 
@@ -119,6 +118,11 @@ std::time_t TransactionInfoImpl::timestamp() const
     return m_timestamp;
 }
 
+string TransactionInfoImpl::paymentId() const
+{
+    return m_paymentid;
+}
+
 const std::vector<TransactionInfo::Transfer> &TransactionInfoImpl::transfers() const
 {
     return m_transfers;
@@ -135,5 +139,3 @@ uint64_t TransactionInfoImpl::unlockTime() const
 }
 
 } // namespace
-
-

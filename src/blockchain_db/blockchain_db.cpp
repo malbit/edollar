@@ -1,22 +1,21 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
-// 
+// Copyright (c)  2017, edollar project (fork from Monero)
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -29,6 +28,7 @@
 
 #include <boost/range/adaptor/reversed.hpp>
 
+#include "string_tools.h"
 #include "blockchain_db.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "profile_tools.h"
@@ -87,7 +87,7 @@ const command_line::arg_descriptor<std::string> arg_db_type = {
 };
 const command_line::arg_descriptor<std::string> arg_db_sync_mode = {
   "db-sync-mode"
-, "Specify sync option, using format [safe|fast|fastest]:[sync|async]:[nblocks_per_sync]." 
+, "Specify sync option, using format [safe|fast|fastest]:[sync|async]:[nblocks_per_sync]."
 , "fast:async:1000"
 };
 const command_line::arg_descriptor<bool> arg_db_salvage  = {
@@ -145,7 +145,7 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
     else if (tx_input.type() == typeid(txin_gen))
     {
       /* nothing to do here */
-       miner_tx = true;
+      miner_tx = true;
     }
     else
     {
@@ -171,7 +171,7 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
   {
     // miner v2 txes have their coinbase output in one single out to save space,
     // and we store them as rct outputs with an identity mask
-    if (miner_tx) 
+    if (miner_tx && tx.version == 2)
     {
       cryptonote::tx_out vout = tx.vout[i];
       rct::key commitment = rct::zeroCommit(vout.amount);
@@ -181,7 +181,8 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
     }
     else
     {
-      amount_output_indices.push_back(add_output(tx_hash, tx.vout[i], i, tx.unlock_time, &tx.rct_signatures.outPk[i].mask));
+      amount_output_indices.push_back(add_output(tx_hash, tx.vout[i], i, tx.unlock_time,
+        tx.version > 1 ? &tx.rct_signatures.outPk[i].mask : NULL));
     }
   }
   add_tx_amount_output_indices(tx_id, amount_output_indices);
@@ -194,6 +195,10 @@ uint64_t BlockchainDB::add_block( const block& blk
                                 , const std::vector<transaction>& txs
                                 )
 {
+  // sanity
+  if (blk.tx_hashes.size() != txs.size())
+    throw std::runtime_error("Inconsistent tx/hashes sizes");
+
   block_txn_start(false);
 
   TIME_MEASURE_START(time1);
@@ -208,7 +213,7 @@ uint64_t BlockchainDB::add_block( const block& blk
   time1 = epee::misc_utils::get_tick_count();
   add_transaction(blk_hash, blk.miner_tx);
   int tx_i = 0;
-  crypto::hash tx_hash = null_hash;
+  crypto::hash tx_hash = crypto::null_hash;
   for (const transaction& tx : txs)
   {
     tx_hash = blk.tx_hashes[tx_i];
@@ -278,7 +283,7 @@ block BlockchainDB::get_block_from_height(const uint64_t& height) const
   blobdata bd = get_block_blob_from_height(height);
   block b;
   if (!parse_and_validate_block_from_blob(bd, b))
-    throw new DB_ERROR("Failed to parse block from blob retrieved from the db");
+    throw DB_ERROR("Failed to parse block from blob retrieved from the db");
 
   return b;
 }
@@ -288,7 +293,7 @@ block BlockchainDB::get_block(const crypto::hash& h) const
   blobdata bd = get_block_blob(h);
   block b;
   if (!parse_and_validate_block_from_blob(bd, b))
-    throw new DB_ERROR("Failed to parse block from blob retrieved from the db");
+    throw DB_ERROR("Failed to parse block from blob retrieved from the db");
 
   return b;
 }
@@ -299,7 +304,7 @@ bool BlockchainDB::get_tx(const crypto::hash& h, cryptonote::transaction &tx) co
   if (!get_tx_blob(h, bd))
     return false;
   if (!parse_and_validate_tx_from_blob(bd, tx))
-    throw new DB_ERROR("Failed to parse transaction from blob retrieved from the db");
+    throw DB_ERROR("Failed to parse transaction from blob retrieved from the db");
 
   return true;
 }
@@ -308,7 +313,7 @@ transaction BlockchainDB::get_tx(const crypto::hash& h) const
 {
   transaction tx;
   if (!get_tx(h, tx))
-    throw new TX_DNE(std::string("tx with hash ").append(epee::string_tools::pod_to_hex(h)).append(" not found in db").c_str());
+    throw TX_DNE(std::string("tx with hash ").append(epee::string_tools::pod_to_hex(h)).append(" not found in db").c_str());
   return tx;
 }
 
@@ -350,9 +355,10 @@ void BlockchainDB::fixup()
     LOG_PRINT_L1("Database is opened read only - skipping fixup check");
     return;
   }
+
   set_batch_transactions(true);
-  // there is nothing to fixup
-  return;
+  batch_start();
+  batch_stop();
 }
 
 }  // namespace cryptonote

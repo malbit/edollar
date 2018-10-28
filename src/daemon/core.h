@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -32,7 +31,6 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 #include "misc_log_ex.h"
-#include "daemon/command_line_args.h"
 
 #undef EDOLLAR_DEFAULT_LOG_CATEGORY
 #define EDOLLAR_DEFAULT_LOG_CATEGORY "daemon"
@@ -68,11 +66,24 @@ public:
     m_core.set_cryptonote_protocol(&protocol);
   }
 
+  std::string get_config_subdir() const
+  {
+    bool testnet = command_line::get_arg(m_vm_HACK, cryptonote::arg_testnet_on);
+    auto p2p_bind_arg = testnet ? nodetool::arg_testnet_p2p_bind_port : nodetool::arg_p2p_bind_port;
+    std::string port = command_line::get_arg(m_vm_HACK, p2p_bind_arg);
+    if ((!testnet && port != std::to_string(::config::P2P_DEFAULT_PORT))
+        || (testnet && port != std::to_string(::config::testnet::P2P_DEFAULT_PORT))) {
+      return port;
+    }
+    return std::string();
+  }
+
   bool run()
   {
     //initialize core here
     MGINFO("Initializing core...");
-    if (!m_core.init(m_vm_HACK))
+    std::string config_subdir = get_config_subdir();
+    if (!m_core.init(m_vm_HACK, config_subdir.empty() ? NULL : config_subdir.c_str()))
     {
       return false;
     }

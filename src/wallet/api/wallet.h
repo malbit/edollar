@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -32,18 +31,16 @@
 #ifndef WALLET_IMPL_H
 #define WALLET_IMPL_H
 
-#include "wallet/wallet2_api.h"
+#include "wallet/api/wallet2_api.h"
 #include "wallet/wallet2.h"
 
 #include <string>
-#include <map>
-#include <iterator>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
 
 
-namespace Edollar {
+namespace edollar {
 class TransactionHistoryImpl;
 class PendingTransactionImpl;
 class UnsignedTransactionImpl;
@@ -62,10 +59,21 @@ public:
     bool createWatchOnly(const std::string &path, const std::string &password,
                             const std::string &language) const;
     bool open(const std::string &path, const std::string &password);
+    bool recover(const std::string &path,const std::string &password,
+                            const std::string &seed);
+    bool recoverFromKeysWithPassword(const std::string &path,
+                            const std::string &password,
+                            const std::string &language,
+                            const std::string &address_string,
+                            const std::string &viewkey_string,
+                            const std::string &spendkey_string = "");
+    // following two methods are deprecated since they create passwordless wallets
+    // use the two equivalent methods above
     bool recover(const std::string &path, const std::string &seed);
+    // deprecated: use recoverFromKeysWithPassword() instead
     bool recoverFromKeys(const std::string &path,
                             const std::string &language,
-                            const std::string &address_string, 
+                            const std::string &address_string,
                             const std::string &viewkey_string,
                             const std::string &spendkey_string = "");
     bool close(bool store = true);
@@ -77,6 +85,7 @@ public:
     std::string errorString() const;
     bool setPassword(const std::string &password);
     std::string address(uint32_t accountIndex = 0, uint32_t addressIndex = 0) const;
+    std::string integratedAddress(const std::string &payment_id) const;
     std::string secretViewKey() const;
     std::string publicViewKey() const;
     std::string secretSpendKey() const;
@@ -117,17 +126,11 @@ public:
     std::string getSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex) const;
     void setSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex, const std::string &label);
 
-    PendingTransaction * createTransaction(const std::string &dst_addr,
+    PendingTransaction * createTransaction(const std::string &dst_addr, const std::string &payment_id,
                                         optional<uint64_t> amount, uint32_t mixin_count,
                                         PendingTransaction::Priority priority = PendingTransaction::Priority_Low,
                                         uint32_t subaddr_account = 0,
                                         std::set<uint32_t> subaddr_indices = {});
-
-    PendingTransaction * createTransactionMany(const std::map<std::string, uint64_t> & dest, 
-                                                   uint32_t mixin_count,
-                                                   PendingTransaction::Priority = PendingTransaction::Priority_Low,
-                                                   uint32_t subaddr_account = 0,
-                                                   std::set<uint32_t> subaddr_indices = {});
     virtual PendingTransaction * createSweepUnmixableTransaction();
     bool submitTransaction(const std::string &fileName);
     virtual UnsignedTransaction * loadUnsignedTx(const std::string &unsigned_filename);
@@ -145,14 +148,21 @@ public:
     virtual bool setUserNote(const std::string &txid, const std::string &note);
     virtual std::string getUserNote(const std::string &txid) const;
     virtual std::string getTxKey(const std::string &txid) const;
+    virtual bool checkTxKey(const std::string &txid, std::string tx_key, const std::string &address, uint64_t &received, bool &in_pool, uint64_t &confirmations);
+    virtual std::string getTxProof(const std::string &txid, const std::string &address, const std::string &message) const;
+    virtual bool checkTxProof(const std::string &txid, const std::string &address, const std::string &message, const std::string &signature, bool &good, uint64_t &received, bool &in_pool, uint64_t &confirmations);
+    virtual std::string getSpendProof(const std::string &txid, const std::string &message) const;
+    virtual bool checkSpendProof(const std::string &txid, const std::string &message, const std::string &signature, bool &good) const;
+    virtual std::string getReserveProof(bool all, uint32_t account_index, uint64_t amount, const std::string &message) const;
+    virtual bool checkReserveProof(const std::string &address, const std::string &message, const std::string &signature, bool &good, uint64_t &total, uint64_t &spent) const;
     virtual std::string signMessage(const std::string &message);
     virtual bool verifySignedMessage(const std::string &message, const std::string &address, const std::string &signature) const;
     virtual void startRefresh();
     virtual void pauseRefresh();
-    virtual bool parse_uri(const std::string &uri, std::string &address, uint64_t &amount, std::string &tx_description, std::string &recipient_name, std::vector<std::string> &unknown_parameters, std::string &error);
+    virtual bool parse_uri(const std::string &uri, std::string &address, std::string &payment_id, uint64_t &amount, std::string &tx_description, std::string &recipient_name, std::vector<std::string> &unknown_parameters, std::string &error);
     virtual std::string getDefaultDataDir() const;
     virtual bool lightWalletLogin(bool &isNewWallet) const;
-    virtual bool lightWalletImportWalletRequest( uint64_t &fee, bool &new_request, bool &request_fulfilled, std::string &payment_address, std::string &status);
+    virtual bool lightWalletImportWalletRequest(std::string &payment_id, uint64_t &fee, bool &new_request, bool &request_fulfilled, std::string &payment_address, std::string &status);
 
 private:
     void clearStatus() const;
@@ -165,7 +175,7 @@ private:
 
 private:
     friend class PendingTransactionImpl;
-    friend class UnsignedTransactionImpl;    
+    friend class UnsignedTransactionImpl;
     friend class TransactionHistoryImpl;
     friend struct Wallet2CallbackImpl;
     friend class AddressBookImpl;
@@ -209,6 +219,4 @@ private:
 } // namespace
 
 
-
 #endif
-

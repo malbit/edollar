@@ -1,4 +1,5 @@
-# Copyright (c)  2017, edollar project (fork from Monero)
+# Copyright (c) 2017-2018, The eDollar Project
+# Copyright (c) 2014-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -40,9 +41,9 @@ set(checkpoints_headers)
 set(checkpoints_private_headers
   checkpoints.h)
 
-edollar_private_headers(checkpoints
+monero_private_headers(checkpoints
   ${checkpoints_private_headers})
-edollar_add_library(checkpoints
+monero_add_library(checkpoints
   ${checkpoints_sources}
   ${checkpoints_headers}
   ${checkpoints_private_headers})

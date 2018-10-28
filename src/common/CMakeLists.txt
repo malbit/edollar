@@ -1,4 +1,4 @@
-# Copyright (c)  2017, edollar project (fork from Monero)
+# Copyright (c) 2014-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -69,12 +69,13 @@ set(common_private_headers
   threadpool.h
   updates.h)
 
-edollar_private_headers(common
+monero_private_headers(common
   ${common_private_headers})
-edollar_add_library(common
+monero_add_library(common
   ${common_sources}
   ${common_headers}
-  ${common_private_headers})
+  ${common_private_headers}
+  DEPENDS generate_translations_header)
 target_link_libraries(common
   PUBLIC
     epee
@@ -90,5 +91,5 @@ target_link_libraries(common
     ${OPENSSL_LIBRARIES}
     ${EXTRA_LIBRARIES})
 
-#edollar_install_headers(common
+#monero_install_headers(common
 #  ${common_headers})

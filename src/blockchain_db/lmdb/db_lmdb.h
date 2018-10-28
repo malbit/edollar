@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c)  2017, edollar project (fork from Monero)
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without modification, are
@@ -30,7 +29,7 @@
 #include <atomic>
 
 #include "blockchain_db/blockchain_db.h"
-#include "cryptonote_protocol/blobdatatype.h" // for type blobdata
+#include "cryptonote_basic/blobdatatype.h" // for type blobdata
 #include "ringct/rctTypes.h"
 #include <boost/thread/tss.hpp>
 
@@ -244,13 +243,13 @@ public:
 
   virtual void add_txpool_tx(const transaction &tx, const txpool_tx_meta_t& meta);
   virtual void update_txpool_tx(const crypto::hash &txid, const txpool_tx_meta_t& meta);
-  virtual uint64_t get_txpool_tx_count() const;
+  virtual uint64_t get_txpool_tx_count(bool include_unrelayed_txes = true) const;
   virtual bool txpool_has_tx(const crypto::hash &txid) const;
   virtual void remove_txpool_tx(const crypto::hash& txid);
-  virtual txpool_tx_meta_t get_txpool_tx_meta(const crypto::hash& txid) const;
+  virtual bool get_txpool_tx_meta(const crypto::hash& txid, txpool_tx_meta_t &meta) const;
   virtual bool get_txpool_tx_blob(const crypto::hash& txid, cryptonote::blobdata &bd) const;
   virtual cryptonote::blobdata get_txpool_tx_blob(const crypto::hash& txid) const;
-  virtual bool for_all_txpool_txes(std::function<bool(const crypto::hash&, const txpool_tx_meta_t&, const cryptonote::blobdata*)> f, bool include_blob = false) const;
+  virtual bool for_all_txpool_txes(std::function<bool(const crypto::hash&, const txpool_tx_meta_t&, const cryptonote::blobdata*)> f, bool include_blob = false, bool include_unrelayed_txes = true) const;
 
   virtual bool for_all_key_images(std::function<bool(const crypto::key_image&)>) const;
   virtual bool for_blocks_range(const uint64_t& h1, const uint64_t& h2, std::function<bool(uint64_t, const crypto::hash&, const cryptonote::block&)>) const;

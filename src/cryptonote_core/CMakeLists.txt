@@ -1,4 +1,4 @@
-# Copyright (c)  2017, edollar project (fork from Monero)
+# Copyright (c) 2014-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -47,9 +47,9 @@ else()
   set(Blocks "")
 endif()
 
-edollar_private_headers(cryptonote_core
+monero_private_headers(cryptonote_core
   ${cryptonote_core_private_headers})
-edollar_add_library(cryptonote_core
+monero_add_library(cryptonote_core
   ${cryptonote_core_sources}
   ${cryptonote_core_headers}
   ${cryptonote_core_private_headers})
@@ -59,6 +59,7 @@ target_link_libraries(cryptonote_core
     common
     cncrypto
     blockchain_db
+    multisig
     ringct
     ${Boost_DATE_TIME_LIBRARY}
     ${Boost_PROGRAM_OPTIONS_LIBRARY}

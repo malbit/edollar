@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -45,6 +44,7 @@
 #include "rpc/rpc_args.h"
 #include "daemon/command_line_args.h"
 #include "blockchain_db/db_types.h"
+#include "version.h"
 
 #ifdef STACK_TRACE
 #include "common/stack_trace.h"
@@ -83,7 +83,6 @@ int main(int argc, char const * argv[])
       command_line::add_arg(visible_options, daemon_args::arg_os_version);
       bf::path default_conf = default_data_dir / std::string(CRYPTONOTE_NAME ".conf");
       command_line::add_arg(visible_options, daemon_args::arg_config_file, default_conf.string());
-      command_line::add_arg(visible_options, command_line::arg_test_dbg_lock_sleep);
 
       // Settings
       bf::path default_log = default_data_dir / std::string(CRYPTONOTE_NAME ".log");
@@ -125,16 +124,16 @@ int main(int argc, char const * argv[])
 
     if (command_line::get_arg(vm, command_line::arg_help))
     {
-      std::cout << "Edollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL << ENDL;
+      std::cout << "eDollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL << ENDL;
       std::cout << "Usage: " + std::string{argv[0]} + " [options|settings] [daemon_command...]" << std::endl << std::endl;
       std::cout << visible_options << std::endl;
       return 0;
     }
 
-    // Edollar Version
+    // Monero Version
     if (command_line::get_arg(vm, command_line::arg_version))
     {
-      std::cout << "Edollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL;
+      std::cout << "eDollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL;
       return 0;
     }
 
@@ -144,8 +143,6 @@ int main(int argc, char const * argv[])
       std::cout << "OS: " << tools::get_os_version_string() << ENDL;
       return 0;
     }
-
-    epee::debug::g_test_dbg_lock_sleep() = command_line::get_arg(vm, command_line::arg_test_dbg_lock_sleep);
 
     std::string db_type = command_line::get_arg(vm, cryptonote::arg_db_type);
 
@@ -157,9 +154,9 @@ int main(int argc, char const * argv[])
       return 0;
     }
 
-    bool testnet_mode = command_line::get_arg(vm, command_line::arg_testnet_on);
+    bool testnet_mode = command_line::get_arg(vm, cryptonote::arg_testnet_on);
 
-    auto data_dir_arg = testnet_mode ? command_line::arg_testnet_data_dir : command_line::arg_data_dir;
+    auto data_dir_arg = testnet_mode ? cryptonote::arg_testnet_data_dir : cryptonote::arg_data_dir;
 
     // data_dir
     //   default: e.g. ~/.bitmonero/ or ~/.bitmonero/testnet
@@ -251,7 +248,12 @@ int main(int argc, char const * argv[])
         if (command_line::has_arg(vm, arg.rpc_login))
         {
           login = tools::login::parse(
-            command_line::get_arg(vm, arg.rpc_login), false, "Daemon client password"
+            command_line::get_arg(vm, arg.rpc_login), false, [](bool verify) {
+#ifdef HAVE_READLINE
+        rdln::suspend_readline pause_readline;
+#endif
+              return tools::password_container::prompt(verify, "Daemon client password");
+            }
           );
           if (!login)
           {
@@ -267,7 +269,7 @@ int main(int argc, char const * argv[])
         }
         else
         {
-          std::cerr << "Unknown command" << std::endl;
+          std::cerr << "Unknown command: " << command.front() << std::endl;
           return 1;
         }
       }
@@ -277,11 +279,11 @@ int main(int argc, char const * argv[])
     tools::set_stack_trace_log(log_file_path.filename().string());
 #endif // STACK_TRACE
 
-    if (command_line::has_arg(vm, daemon_args::arg_max_concurrency))
+    if (!command_line::is_arg_defaulted(vm, daemon_args::arg_max_concurrency))
       tools::set_max_concurrency(command_line::get_arg(vm, daemon_args::arg_max_concurrency));
 
     // logging is now set up
-    MGINFO("Edollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")");
+    MGINFO("eDollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")");
 
     MINFO("Moving from main() into the daemonize now.");
 

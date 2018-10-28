@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -35,6 +34,8 @@
 #include "serialization/keyvalue_serialization.h"
 #include "net/net_utils_base.h"
 #include "misc_language.h"
+#include "string_tools.h"
+#include "time_helper.h"
 #include "cryptonote_config.h"
 #ifdef ALLOW_DEBUG_COMMANDS
 #include "crypto/crypto.h"

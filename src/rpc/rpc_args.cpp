@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -31,6 +30,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/ip/address.hpp>
+#include <boost/bind.hpp>
 #include "common/command_line.h"
 #include "common/i18n.h"
 
@@ -58,7 +58,7 @@ namespace cryptonote
   {
     const descriptors arg{};
     rpc_args config{};
-    
+
     config.bind_ip = command_line::get_arg(vm, arg.rpc_bind_ip);
     if (!config.bind_ip.empty())
     {
@@ -84,7 +84,9 @@ namespace cryptonote
 
     if (command_line::has_arg(vm, arg.rpc_login))
     {
-      config.login = tools::login::parse(command_line::get_arg(vm, arg.rpc_login), true, "RPC server password");
+      config.login = tools::login::parse(command_line::get_arg(vm, arg.rpc_login), true, [](bool verify) {
+        return tools::password_container::prompt(verify, "RPC server password");
+      });
       if (!config.login)
         return boost::none;
 

@@ -29,7 +29,8 @@
 #define _FILE_IO_UTILS_H_
 
 #include <iostream>
-#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/operations.hpp>
 
 namespace epee
 {
@@ -63,7 +64,7 @@ namespace file_io_utils
 	}
 
 	inline
-	bool get_file_time(const std::string& path_to_file, OUT time_t& ft)
+	bool get_file_time(const std::string& path_to_file, time_t& ft)
 	{
 		boost::system::error_code ec;
 		ft = boost::filesystem::last_write_time(boost::filesystem::path(path_to_file), ec);
@@ -132,6 +133,26 @@ namespace file_io_utils
 			return false;
 		}
 	}
+
+	inline
+		bool get_file_size(const std::string& path_to_file, uint64_t &size)
+	{
+		try
+		{
+			std::ifstream fstream;
+			fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+			fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
+			size = fstream.tellg();
+			fstream.close();
+			return true;
+		}
+
+		catch(...)
+		{
+			return false;
+		}
+	}
+
 }
 }
 

@@ -1,5 +1,4 @@
-# Copyright (c) 2017-2018, The EDollar Project
-# Copyright (c) 2014-2017, The Monero Project
+# Copyright (c) 2016-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -35,9 +34,9 @@ set(serialization_headers)
 set(serialization_private_headers
   json_object.h)
 
-edollar_private_headers(serialization
+monero_private_headers(serialization
   ${serialization_private_headers})
-edollar_add_library(serialization
+monero_add_library(serialization
   ${serialization_sources}
   ${serialization_headers}
   ${serialization_private_headers})

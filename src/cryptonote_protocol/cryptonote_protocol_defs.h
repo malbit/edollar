@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -34,7 +33,7 @@
 #include <list>
 #include "serialization/keyvalue_serialization.h"
 #include "cryptonote_basic/cryptonote_basic.h"
-#include "cryptonote_protocol/blobdatatype.h"
+#include "cryptonote_basic/blobdatatype.h"
 namespace cryptonote
 {
 
@@ -75,7 +74,7 @@ namespace cryptonote
   
 	uint32_t support_flags;
 
-	boost::uuids::uuid connection_id;
+	std::string connection_id;
 
     uint64_t height;
 
@@ -99,7 +98,7 @@ namespace cryptonote
       KV_SERIALIZE(avg_upload)
       KV_SERIALIZE(current_upload)
       KV_SERIALIZE(support_flags)
-      KV_SERIALIZE_VAL_POD_AS_BLOB(connection_id)
+      KV_SERIALIZE(connection_id)
       KV_SERIALIZE(height)
     END_KV_SERIALIZE_MAP()
   };
@@ -272,7 +271,7 @@ namespace cryptonote
     {
       crypto::hash block_hash;
       uint64_t current_blockchain_height;      
-      std::vector<size_t> missing_tx_indices;
+      std::vector<uint64_t> missing_tx_indices;
       
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_VAL_POD_AS_BLOB(block_hash)

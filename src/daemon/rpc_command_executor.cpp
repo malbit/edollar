@@ -1,22 +1,21 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
-// 
+// Copyright (c) 2014-2018, The Monero Project
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -469,13 +468,13 @@ bool t_rpc_command_executor::print_connections() {
 
   tools::msg_writer() << std::setw(30) << std::left << "Remote Host"
       << std::setw(20) << "Peer id"
-      << std::setw(20) << "Support Flags"      
+      << std::setw(20) << "Support Flags"
       << std::setw(30) << "Recv/Sent (inactive,sec)"
       << std::setw(25) << "State"
       << std::setw(20) << "Livetime(sec)"
       << std::setw(12) << "Down (kB/s)"
       << std::setw(14) << "Down(now)"
-      << std::setw(10) << "Up (kB/s)" 
+      << std::setw(10) << "Up (kB/s)"
       << std::setw(13) << "Up(now)"
       << std::endl;
 
@@ -484,7 +483,7 @@ bool t_rpc_command_executor::print_connections() {
     std::string address = info.incoming ? "INC " : "OUT ";
     address += info.ip + ":" + info.port;
     //std::string in_out = info.incoming ? "INC " : "OUT ";
-    tools::msg_writer() 
+    tools::msg_writer()
      //<< std::setw(30) << std::left << in_out
      << std::setw(30) << std::left << address
      << std::setw(20) << epee::string_tools::pad_string(info.peer_id, 16, '0', true)
@@ -496,11 +495,11 @@ bool t_rpc_command_executor::print_connections() {
      << std::setw(14) << info.current_download
      << std::setw(10) << info.avg_upload
      << std::setw(13) << info.current_upload
-     
+
      << std::left << (info.localhost ? "[LOCALHOST]" : "")
      << std::left << (info.local_ip ? "[LAN]" : "");
     //tools::msg_writer() << boost::format("%-25s peer_id: %-25s %s") % address % info.peer_id % in_out;
-    
+
   }
 
   return true;
@@ -539,7 +538,7 @@ bool t_rpc_command_executor::print_blockchain_info(uint64_t start_block_index, u
       std::cout << std::endl;
     std::cout
       << "height: " << header.height << ", timestamp: " << header.timestamp << ", difficulty: " << header.difficulty
-      << ", size: " << header.block_size << std::endl
+      << ", size: " << header.block_size << ", transactions: " << header.num_txes << std::endl
       << "major version: " << (unsigned)header.major_version << ", minor version: " << (unsigned)header.minor_version << std::endl
       << "block id: " << header.hash << ", previous block id: " << header.prev_hash << std::endl
       << "difficulty: " << header.difficulty << ", nonce " << header.nonce << ", reward " << cryptonote::print_money(header.reward) << std::endl;
@@ -815,7 +814,7 @@ bool t_rpc_command_executor::print_transaction_pool_long() {
   }
   else
   {
-    if (!m_rpc_server->on_get_transaction_pool(req, res) || res.status != CORE_RPC_STATUS_OK)
+    if (!m_rpc_server->on_get_transaction_pool(req, res, false) || res.status != CORE_RPC_STATUS_OK)
     {
       tools::fail_msg_writer() << make_error(fail_message, res.status);
       return true;
@@ -841,6 +840,7 @@ bool t_rpc_command_executor::print_transaction_pool_long() {
                           << "relayed: " << [&](const cryptonote::tx_info &tx_info)->std::string { if (!tx_info.relayed) return "no"; return boost::lexical_cast<std::string>(tx_info.last_relayed_time) + " (" + get_human_time_ago(tx_info.last_relayed_time, now) + ")"; } (tx_info) << std::endl
                           << "do_not_relay: " << (tx_info.do_not_relay ? 'T' : 'F')  << std::endl
                           << "kept_by_block: " << (tx_info.kept_by_block ? 'T' : 'F') << std::endl
+                          << "double_spend_seen: " << (tx_info.double_spend_seen ? 'T' : 'F')  << std::endl
                           << "max_used_block_height: " << tx_info.max_used_block_height << std::endl
                           << "max_used_block_id: " << tx_info.max_used_block_id_hash << std::endl
                           << "last_failed_height: " << tx_info.last_failed_height << std::endl
@@ -899,7 +899,7 @@ bool t_rpc_command_executor::print_transaction_pool_short() {
   }
   else
   {
-    if (!m_rpc_server->on_get_transaction_pool(req, res) || res.status != CORE_RPC_STATUS_OK)
+    if (!m_rpc_server->on_get_transaction_pool(req, res, false) || res.status != CORE_RPC_STATUS_OK)
     {
       tools::fail_msg_writer() << make_error(fail_message, res.status);
       return true;
@@ -923,6 +923,7 @@ bool t_rpc_command_executor::print_transaction_pool_short() {
                           << "relayed: " << [&](const cryptonote::tx_info &tx_info)->std::string { if (!tx_info.relayed) return "no"; return boost::lexical_cast<std::string>(tx_info.last_relayed_time) + " (" + get_human_time_ago(tx_info.last_relayed_time, now) + ")"; } (tx_info) << std::endl
                           << "do_not_relay: " << (tx_info.do_not_relay ? 'T' : 'F')  << std::endl
                           << "kept_by_block: " << (tx_info.kept_by_block ? 'T' : 'F') << std::endl
+                          << "double_spend_seen: " << (tx_info.double_spend_seen ? 'T' : 'F') << std::endl
                           << "max_used_block_height: " << tx_info.max_used_block_height << std::endl
                           << "max_used_block_id: " << tx_info.max_used_block_id_hash << std::endl
                           << "last_failed_height: " << tx_info.last_failed_height << std::endl
@@ -955,7 +956,7 @@ bool t_rpc_command_executor::print_transaction_pool_stats() {
   else
   {
     memset(&res.pool_stats, 0, sizeof(res.pool_stats));
-    if (!m_rpc_server->on_get_transaction_pool_stats(req, res) || res.status != CORE_RPC_STATUS_OK)
+    if (!m_rpc_server->on_get_transaction_pool_stats(req, res, false) || res.status != CORE_RPC_STATUS_OK)
     {
       tools::fail_msg_writer() << make_error(fail_message, res.status);
       return true;
@@ -980,12 +981,12 @@ bool t_rpc_command_executor::print_transaction_pool_stats() {
   else
   {
     uint64_t backlog = (res.pool_stats.bytes_total + full_reward_zone - 1) / full_reward_zone;
-    backlog_message = (boost::format("estimated %u block (%u minutes) backlog") % backlog % (backlog * DIFFICULTY_TARGET / 60)).str();
+    backlog_message = (boost::format("estimated %u block (%u minutes) backlog") % backlog % (backlog * DIFFICULTY_TARGET_V2 / 60)).str();
   }
 
   tools::msg_writer() << n_transactions << " tx(es), " << res.pool_stats.bytes_total << " bytes total (min " << res.pool_stats.bytes_min << ", max " << res.pool_stats.bytes_max << ", avg " << avg_bytes << ", median " << res.pool_stats.bytes_med << ")" << std::endl
       << "fees " << cryptonote::print_money(res.pool_stats.fee_total) << " (avg " << cryptonote::print_money(n_transactions ? res.pool_stats.fee_total / n_transactions : 0) << " per tx" << ", " << cryptonote::print_money(res.pool_stats.bytes_total ? res.pool_stats.fee_total / res.pool_stats.bytes_total : 0) << " per byte)" << std::endl
-      << res.pool_stats.num_not_relayed << " not relayed, " << res.pool_stats.num_failing << " failing, " << res.pool_stats.num_10m << " older than 10 minutes (oldest " << (res.pool_stats.oldest == 0 ? "-" : get_human_time_ago(res.pool_stats.oldest, now)) << "), " << backlog_message;
+      << res.pool_stats.num_double_spends << " double spends, " << res.pool_stats.num_not_relayed << " not relayed, " << res.pool_stats.num_failing << " failing, " << res.pool_stats.num_10m << " older than 10 minutes (oldest " << (res.pool_stats.oldest == 0 ? "-" : get_human_time_ago(res.pool_stats.oldest, now)) << "), " << backlog_message;
 
   if (n_transactions > 1 && res.pool_stats.histo.size())
   {
@@ -1010,7 +1011,7 @@ bool t_rpc_command_executor::print_transaction_pool_stats() {
     tools::msg_writer() << "   Age      Txes       Bytes";
     for (i=0; i<n; i++)
     {
-      tools::msg_writer() << get_time_hms(times[i]) << setw(8) << res.pool_stats.histo[i].txs << setw(12) << res.pool_stats.histo[i].bytes;
+      tools::msg_writer() << get_time_hms(times[i]) << std::setw(8) << res.pool_stats.histo[i].txs << std::setw(12) << res.pool_stats.histo[i].bytes;
     }
   }
   tools::msg_writer();
@@ -1025,7 +1026,7 @@ bool t_rpc_command_executor::start_mining(cryptonote::account_public_address add
   req.threads_count = num_threads;
   req.do_background_mining = do_background_mining;
   req.ignore_battery = ignore_battery;
-  
+
   std::string fail_message = "Mining did not start";
 
   if (m_is_rpc)
@@ -1252,11 +1253,11 @@ bool t_rpc_command_executor::out_peers(uint64_t limit)
 {
 	cryptonote::COMMAND_RPC_OUT_PEERS::request req;
 	cryptonote::COMMAND_RPC_OUT_PEERS::response res;
-	
+
 	epee::json_rpc::error error_resp;
 
 	req.out_peers = limit;
-	
+
 	std::string fail_message = "Unsuccessful";
 
 	if (m_is_rpc)
@@ -1285,7 +1286,7 @@ bool t_rpc_command_executor::start_save_graph()
 	cryptonote::COMMAND_RPC_START_SAVE_GRAPH::request req;
 	cryptonote::COMMAND_RPC_START_SAVE_GRAPH::response res;
 	std::string fail_message = "Unsuccessful";
-	
+
 	if (m_is_rpc)
 	{
 		if (!m_rpc_client->rpc_request(req, res, "/start_save_graph", fail_message.c_str()))
@@ -1293,7 +1294,7 @@ bool t_rpc_command_executor::start_save_graph()
 			return true;
 		}
 	}
-	
+
 	else
     {
 		if (!m_rpc_server->on_start_save_graph(req, res) || res.status != CORE_RPC_STATUS_OK)
@@ -1302,7 +1303,8 @@ bool t_rpc_command_executor::start_save_graph()
 			return true;
 		}
 	}
-	
+
+	tools::success_msg_writer() << "Saving graph is now on";
 	return true;
 }
 
@@ -1311,7 +1313,7 @@ bool t_rpc_command_executor::stop_save_graph()
 	cryptonote::COMMAND_RPC_STOP_SAVE_GRAPH::request req;
 	cryptonote::COMMAND_RPC_STOP_SAVE_GRAPH::response res;
 	std::string fail_message = "Unsuccessful";
-	
+
 	if (m_is_rpc)
 	{
 		if (!m_rpc_client->rpc_request(req, res, "/stop_save_graph", fail_message.c_str()))
@@ -1319,7 +1321,7 @@ bool t_rpc_command_executor::stop_save_graph()
 			return true;
 		}
 	}
-	
+
 	else
     {
 		if (!m_rpc_server->on_stop_save_graph(req, res) || res.status != CORE_RPC_STATUS_OK)
@@ -1328,6 +1330,7 @@ bool t_rpc_command_executor::stop_save_graph()
 			return true;
 		}
 	}
+	tools::success_msg_writer() << "Saving graph is now off";
 	return true;
 }
 
@@ -1494,6 +1497,7 @@ bool t_rpc_command_executor::flush_txpool(const std::string &txid)
         }
     }
 
+    tools::success_msg_writer() << "Pool successfully flushed";
     return true;
 }
 
@@ -1566,7 +1570,7 @@ bool t_rpc_command_executor::print_coinbase_tx_sum(uint64_t height, uint64_t cou
   tools::msg_writer() << "Sum of coinbase transactions between block heights ["
     << height << ", " << (height + count) << ") is "
     << cryptonote::print_money(res.emission_amount + res.fee_amount) << " "
-    << "consisting of " << cryptonote::print_money(res.emission_amount) 
+    << "consisting of " << cryptonote::print_money(res.emission_amount)
     << " in emissions, and " << cryptonote::print_money(res.fee_amount) << " in fees";
   return true;
 }
@@ -1607,7 +1611,7 @@ bool t_rpc_command_executor::alt_chain_info()
   }
 
   tools::msg_writer() << boost::lexical_cast<std::string>(res.chains.size()) << " alternate chains found:";
-  for (const auto chain: res.chains)
+  for (const auto &chain: res.chains)
   {
     uint64_t start_height = (chain.height - chain.length + 1);
     tools::msg_writer() << chain.length << " blocks long, from height " << start_height << " (" << (ires.height - start_height - 1)
@@ -1796,6 +1800,7 @@ bool t_rpc_command_executor::relay_tx(const std::string &txid)
         }
     }
 
+    tools::success_msg_writer() << "Transaction successfully relayed";
     return true;
 }
 

@@ -1,7 +1,6 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Word list originally created as part of the Electrum project, Copyright (C) 2014 Thomas Voegtlin
 // 
-// Copyright (c) 2017, edollar project (fork from Monero) 
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 

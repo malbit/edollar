@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -37,15 +36,38 @@ using namespace epee;
 
 #include "common/dns_utils.h"
 #include "include_base_utils.h"
+#include "string_tools.h"
 #include "storages/portable_storage_template_helper.h" // epee json include
-#include <sstream>
-#include <random>
+#include "serialization/keyvalue_serialization.h"
 
 #undef EDOLLAR_DEFAULT_LOG_CATEGORY
 #define EDOLLAR_DEFAULT_LOG_CATEGORY "checkpoints"
 
 namespace cryptonote
 {
+  /**
+   * @brief struct for loading a checkpoint from json
+   */
+  struct t_hashline
+  {
+    uint64_t height; //!< the height of the checkpoint
+    std::string hash; //!< the hash for the checkpoint
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(height)
+          KV_SERIALIZE(hash)
+        END_KV_SERIALIZE_MAP()
+  };
+
+  /**
+   * @brief struct for loading many checkpoints from json
+   */
+  struct t_hash_json {
+    std::vector<t_hashline> hashlines; //!< the checkpoint lines from the file
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(hashlines)
+        END_KV_SERIALIZE_MAP()
+  };
+
   //---------------------------------------------------------------------------
   checkpoints::checkpoints()
   {
@@ -113,9 +135,9 @@ namespace cryptonote
   //---------------------------------------------------------------------------
   uint64_t checkpoints::get_max_height() const
   {
-    std::map< uint64_t, crypto::hash >::const_iterator highest = 
+    std::map< uint64_t, crypto::hash >::const_iterator highest =
         std::max_element( m_points.begin(), m_points.end(),
-                         ( boost::bind(&std::map< uint64_t, crypto::hash >::value_type::first, _1) < 
+                         ( boost::bind(&std::map< uint64_t, crypto::hash >::value_type::first, _1) <
                            boost::bind(&std::map< uint64_t, crypto::hash >::value_type::first, _2 ) ) );
     return highest->first;
   }
@@ -141,19 +163,17 @@ namespace cryptonote
   {
     if (testnet)
     {
-      // just use the genesis block on testnet
-      //ADD_CHECKPOINT(0,     "48ca7cd3c8de5b6a4d53d2861fbdaedca141553559f9be9520068053cda8430b");
       return true;
     }
-     ADD_CHECKPOINT(0,     "5fabaea26f7663465899df9bccb9237472d8f0a37e10de02c2a9b0011e97d13a");
-     ADD_CHECKPOINT(10,     "c72898b6dd46287dee82e739c0b344e5709f413cbe709f4ab3efd110ca7a5ed8");
-     ADD_CHECKPOINT(100,     "71b7586578329758c8005c81fae3a90488c49731ba93df5e0613b19e25081f32");
-     ADD_CHECKPOINT(1000,     "30f8e56040c7c74c7a9e2f3bbbb05150a95da8402726429724c7bd2d4353920c");
-     ADD_CHECKPOINT(9000,     "7747e25eda5c3e9fe2bb92562da62cd4ed35adcea805f7e57a6ada09a65b9872");
+                    ADD_CHECKPOINT(0,     "5fabaea26f7663465899df9bccb9237472d8f0a37e10de02c2a9b0011e97d13a");
+                    ADD_CHECKPOINT(10,     "c72898b6dd46287dee82e739c0b344e5709f413cbe709f4ab3efd110ca7a5ed8");
+                    ADD_CHECKPOINT(100,     "71b7586578329758c8005c81fae3a90488c49731ba93df5e0613b19e25081f32");
+                    ADD_CHECKPOINT(1000,     "30f8e56040c7c74c7a9e2f3bbbb05150a95da8402726429724c7bd2d4353920c");
+                    ADD_CHECKPOINT(9000,     "7747e25eda5c3e9fe2bb92562da62cd4ed35adcea805f7e57a6ada09a65b9872");
     return true;
   }
 
-  bool checkpoints::load_checkpoints_from_json(const std::string json_hashfile_fullpath)
+  bool checkpoints::load_checkpoints_from_json(const std::string &json_hashfile_fullpath)
   {
     boost::system::error_code errcode;
     if (! (boost::filesystem::exists(json_hashfile_fullpath, errcode)))
@@ -167,7 +187,11 @@ namespace cryptonote
     uint64_t prev_max_height = get_max_height();
     LOG_PRINT_L1("Hard-coded max checkpoint height is " << prev_max_height);
     t_hash_json hashes;
-    epee::serialization::load_t_from_json_file(hashes, json_hashfile_fullpath);
+    if (!epee::serialization::load_t_from_json_file(hashes, json_hashfile_fullpath))
+    {
+      MERROR("Error loading checkpoints from " << json_hashfile_fullpath);
+      return false;
+    }
     for (std::vector<t_hashline>::const_iterator it = hashes.hashlines.begin(); it != hashes.hashlines.end(); )
     {
       uint64_t height;
@@ -190,12 +214,10 @@ namespace cryptonote
     std::vector<std::string> records;
 
     // All four MoneroPulse domains have DNSSEC on and valid
-    static const std::vector<std::string> dns_urls = { "checkpoints.edollar.cash"
-						     , "checkpoints.electronicdollar.org"
+    static const std::vector<std::string> dns_urls = {
     };
 
-    static const std::vector<std::string> testnet_dns_urls = { "testpoints.edollar.cash"
-							  , "testpoints.electronicdollar.org"
+    static const std::vector<std::string> testnet_dns_urls = {
     };
 
     if (!tools::dns_utils::load_txt_records_from_dns(records, testnet ? testnet_dns_urls : dns_urls))
@@ -231,7 +253,7 @@ namespace cryptonote
     return true;
   }
 
-  bool checkpoints::load_new_checkpoints(const std::string json_hashfile_fullpath, bool testnet, bool dns)
+  bool checkpoints::load_new_checkpoints(const std::string &json_hashfile_fullpath, bool testnet, bool dns)
   {
     bool result;
 

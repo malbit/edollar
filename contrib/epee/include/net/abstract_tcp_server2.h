@@ -1,7 +1,7 @@
 /**
 @file
 @author from CrypoNote (see copyright below; Andrey N. Sabelnikov)
-@edollar rfree
+@monero rfree
 @brief the connection templated-class for one peer connection
 */
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
@@ -54,8 +54,8 @@
 #include <boost/thread/thread.hpp>
 #include "net_utils_base.h"
 #include "syncobj.h"
-#include "../../../../src/p2p/connection_basic.hpp"
-#include "../../../../src/p2p/network_throttle-detail.hpp"
+#include "connection_basic.hpp"
+#include "network_throttle-detail.hpp"
 
 #undef EDOLLAR_DEFAULT_LOG_CATEGORY
 #define EDOLLAR_DEFAULT_LOG_CATEGORY "net"
@@ -212,6 +212,12 @@ namespace net_utils
     typename t_protocol_handler::config_type& get_config_object(){return m_config;}
 
     int get_binded_port(){return m_port;}
+
+    long get_connections_count() const
+    {
+      auto connections_count = (m_sock_count > 0) ? (m_sock_count - 1) : 0; // Socket count minus listening socket
+      return connections_count;
+    }
 
     boost::asio::io_service& get_io_service(){return io_service_;}
 

@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2016-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -42,44 +41,12 @@ namespace tools
 class PerformanceTimer;
 
 extern el::Level performance_timer_log_level;
-extern __thread std::vector<PerformanceTimer*> *performance_timers;
 
 class PerformanceTimer
 {
 public:
-  PerformanceTimer(const std::string &s, uint64_t unit, el::Level l = el::Level::Debug): name(s), unit(unit), level(l), started(false)
-  {
-    ticks = epee::misc_utils::get_ns_count();
-    if (!performance_timers)
-    {
-      MLOG(level, "PERF             ----------");
-      performance_timers = new std::vector<PerformanceTimer*>();
-    }
-    else
-    {
-      PerformanceTimer *pt = performance_timers->back();
-      if (!pt->started)
-      {
-        MLOG(pt->level, "PERF           " << std::string((performance_timers->size()-1) * 2, ' ') << "  " << pt->name);
-        pt->started = true;
-      }
-    }
-    performance_timers->push_back(this);
-  }
-
-  ~PerformanceTimer()
-  {
-    performance_timers->pop_back();
-    ticks = epee::misc_utils::get_ns_count() - ticks;
-    char s[12];
-    snprintf(s, sizeof(s), "%8llu  ", (unsigned long long)ticks / (1000000000 / unit));
-    MLOG(level, "PERF " << s << std::string(performance_timers->size() * 2, ' ') << "  " << name);
-    if (performance_timers->empty())
-    {
-      delete performance_timers;
-      performance_timers = NULL;
-    }
-  }
+  PerformanceTimer(const std::string &s, uint64_t unit, el::Level l = el::Level::Debug);
+  ~PerformanceTimer();
 
 private:
   std::string name;
@@ -95,5 +62,8 @@ void set_performance_timer_log_level(el::Level level);
 #define PERF_TIMER_UNIT_L(name, unit, l) tools::PerformanceTimer pt_##name(#name, unit, l)
 #define PERF_TIMER(name) PERF_TIMER_UNIT(name, 1000)
 #define PERF_TIMER_L(name, l) PERF_TIMER_UNIT_L(name, 1000, l)
+#define PERF_TIMER_START_UNIT(name, unit) tools::PerformanceTimer *pt_##name = new tools::PerformanceTimer(#name, unit, el::Level::Info)
+#define PERF_TIMER_START(name) PERF_TIMER_START_UNIT(name, 1000)
+#define PERF_TIMER_STOP(name) do { delete pt_##name; pt_##name = NULL; } while(0)
 
 }

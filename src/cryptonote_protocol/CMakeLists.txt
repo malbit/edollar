@@ -1,4 +1,4 @@
-# Copyright (c)  2017, edollar project (fork from Monero)
+# Copyright (c) 2014-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -32,8 +32,8 @@ project (edollar CXX)
 file(GLOB CRYPTONOTE_PROTOCOL *)
 source_group(cryptonote_protocol FILES ${CRYPTONOTE_PROTOCOL})
 
-#edollar_private_headers(cryptonote_protocol ${CRYPTONOTE_PROTOCOL})
-edollar_add_library(cryptonote_protocol ${CRYPTONOTE_PROTOCOL})
+#monero_private_headers(cryptonote_protocol ${CRYPTONOTE_PROTOCOL})
+monero_add_library(cryptonote_protocol ${CRYPTONOTE_PROTOCOL})
 target_link_libraries(cryptonote_protocol
   PUBLIC
     p2p

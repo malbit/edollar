@@ -1,4 +1,4 @@
-# Copyright (c)  2017, edollar project (fork from Monero)
+# Copyright (c) 2014-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -26,9 +26,12 @@
 # STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+set(rpc_base_sources
+  rpc_args.cpp)
+
 set(rpc_sources
   core_rpc_server.cpp
-  rpc_args.cpp)
+  instanciations)
 
 set(daemon_messages_sources
   message.cpp
@@ -39,8 +42,10 @@ set(daemon_rpc_server_sources
   zmq_server.cpp)
 
 
-set(rpc_headers
+set(rpc_base_headers
   rpc_args.h)
+
+set(rpc_headers)
 
 set(daemon_rpc_server_headers)
 
@@ -62,31 +67,47 @@ set(daemon_rpc_server_private_headers
   zmq_server.h)
 
 
-edollar_private_headers(rpc
+monero_private_headers(rpc
   ${rpc_private_headers})
 
-edollar_private_headers(daemon_rpc_server
+monero_private_headers(daemon_rpc_server
   ${daemon_rpc_server_private_headers})
 
 
-edollar_add_library(rpc
+monero_add_library(rpc_base
+  ${rpc_base_sources}
+  ${rpc_base_headers}
+  ${rpc_base_private_headers})
+
+monero_add_library(rpc
   ${rpc_sources}
   ${rpc_headers}
   ${rpc_private_headers})
 
-edollar_add_library(daemon_messages
+monero_add_library(daemon_messages
   ${daemon_messages_sources}
   ${daemon_messages_headers}
   ${daemon_messages_private_headers})
 
-edollar_add_library(daemon_rpc_server
+monero_add_library(daemon_rpc_server
   ${daemon_rpc_server_sources}
   ${daemon_rpc_server_headers}
   ${daemon_rpc_server_private_headers})
 
 
+target_link_libraries(rpc_base
+  PUBLIC
+    common
+    epee
+    ${Boost_REGEX_LIBRARY}
+    ${Boost_THREAD_LIBRARY}
+    ${Boost_PROGRAM_OPTIONS_LIBRARY}
+  PRIVATE
+    ${EXTRA_LIBRARIES})
+
 target_link_libraries(rpc
   PUBLIC
+    rpc_base
     common
     cryptonote_core
     cryptonote_protocol
@@ -105,6 +126,7 @@ target_link_libraries(daemon_messages
 
 target_link_libraries(daemon_rpc_server
   LINK_PRIVATE
+    rpc
     cryptonote_core
     cryptonote_protocol
     daemon_messages

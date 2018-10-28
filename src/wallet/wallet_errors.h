@@ -1,22 +1,21 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
-// 
+// Copyright (c) 2014-2018, The Monero Project
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -26,7 +25,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -51,6 +50,8 @@ namespace tools
     //       wallet_internal_error
     //         unexpected_txin_type
     //         wallet_not_initialized
+    //       multisig_export_needed
+    //       multisig_import_needed
     //   std::logic_error
     //     wallet_logic_error *
     //       file_exists
@@ -59,6 +60,7 @@ namespace tools
     //       file_save_error
     //       invalid_password
     //       invalid_priority
+    //       invalid_multisig_seed
     //       refresh_error *
     //         acc_outs_lookup_error
     //         block_parse_error
@@ -187,7 +189,22 @@ namespace tools
       {
       }
     };
-
+    //----------------------------------------------------------------------------------------------------
+    struct multisig_export_needed : public wallet_runtime_error
+    {
+      explicit multisig_export_needed(std::string&& loc)
+        : wallet_runtime_error(std::move(loc), "This signature was made with stale data: export fresh multisig data, which other participants must then use")
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
+    struct multisig_import_needed : public wallet_runtime_error
+    {
+      explicit multisig_import_needed(std::string&& loc)
+        : wallet_runtime_error(std::move(loc), "Not enough multisig data was found to sign: import multisig data from more other participants")
+      {
+      }
+    };
     //----------------------------------------------------------------------------------------------------
     const char* const file_error_messages[] = {
       "file already exists",
@@ -250,6 +267,16 @@ namespace tools
       std::string to_string() const { return wallet_logic_error::to_string(); }
     };
 
+    struct invalid_multisig_seed : public wallet_logic_error
+    {
+      explicit invalid_multisig_seed(std::string&& loc)
+        : wallet_logic_error(std::move(loc), "invalid multisig seed")
+      {
+      }
+
+      std::string to_string() const { return wallet_logic_error::to_string(); }
+    };
+
     //----------------------------------------------------------------------------------------------------
     struct invalid_pregenerated_random : public wallet_logic_error
     {
@@ -266,6 +293,28 @@ namespace tools
     protected:
       explicit refresh_error(std::string&& loc, const std::string& message)
         : wallet_logic_error(std::move(loc), message)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
+    struct index_outofbound : public wallet_logic_error
+    {
+      explicit index_outofbound(std::string&& loc, const std::string& message)
+        : wallet_logic_error(std::move(loc), message)
+      {
+      }
+    };
+    struct account_index_outofbound : public index_outofbound
+    {
+      explicit account_index_outofbound(std::string&& loc)
+        : index_outofbound(std::move(loc), "account index is out of bound")
+      {
+      }
+    };
+    struct address_index_outofbound: public index_outofbound
+    {
+      explicit address_index_outofbound(std::string&& loc)
+        : index_outofbound(std::move(loc), "address index is out of bound")
       {
       }
     };
@@ -765,6 +814,12 @@ namespace tools
 
 #define STRINGIZE_DETAIL(x) #x
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
+
+#define THROW_WALLET_EXCEPTION(err_type, ...)                                                               \
+  do {                                                                                                      \
+    LOG_ERROR("THROW EXCEPTION: " << #err_type);                                                 \
+    tools::error::throw_wallet_ex<err_type>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ## __VA_ARGS__); \
+  } while(0)
 
 #define THROW_WALLET_EXCEPTION_IF(cond, err_type, ...)                                                      \
   if (cond)                                                                                                 \

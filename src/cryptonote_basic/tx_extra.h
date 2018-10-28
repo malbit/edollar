@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -41,6 +40,9 @@
 #define TX_EXTRA_MERGE_MINING_TAG           0x03
 #define TX_EXTRA_TAG_ADDITIONAL_PUBKEYS     0x04
 #define TX_EXTRA_MYSTERIOUS_MINERGATE_TAG   0xDE
+
+#define TX_EXTRA_NONCE_PAYMENT_ID           0x00
+#define TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID 0x01
 
 namespace cryptonote
 {

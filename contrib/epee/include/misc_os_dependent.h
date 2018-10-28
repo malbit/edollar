@@ -23,6 +23,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
+#ifdef _WIN32
+#include <Winsock2.h>
+#endif
+
 #ifdef WIN32
   #ifndef WIN32_LEAN_AND_MEAN 
   #define WIN32_LEAN_AND_MEAN
@@ -41,6 +45,9 @@
 #include <mach/clock.h>
 #include <mach/mach.h>
 #endif
+
+#include <iostream>
+#include <boost/lexical_cast.hpp>
 
 #pragma once 
 namespace epee

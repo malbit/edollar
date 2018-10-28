@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2017-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -27,10 +26,10 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "wallet/wallet2_api.h"
+#include "wallet/api/wallet2_api.h"
 #include "wallet/wallet2.h"
 
-namespace Edollar {
+namespace edollar {
 
 class WalletImpl;
 
@@ -39,7 +38,7 @@ class SubaddressAccountImpl : public SubaddressAccount
 public:
     SubaddressAccountImpl(WalletImpl * wallet);
     ~SubaddressAccountImpl();
-    
+
     // Fetches addresses from Wallet2
     void refresh();
     std::vector<SubaddressAccountRow*> getAll() const;
@@ -48,7 +47,7 @@ public:
 
 private:
     void clearRows();
-    
+
 private:
     WalletImpl *m_wallet;
     std::vector<SubaddressAccountRow*> m_rows;

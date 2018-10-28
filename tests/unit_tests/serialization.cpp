@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -39,7 +38,6 @@
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "ringct/rctSigs.h"
-#include "serialization/serialization.h"
 #include "serialization/binary_archive.h"
 #include "serialization/json_archive.h"
 #include "serialization/debug_archive.h"
@@ -50,6 +48,7 @@
 #include "gtest/gtest.h"
 #include "unit_tests_utils.h"
 using namespace std;
+using namespace crypto;
 
 struct Struct
 {
@@ -591,7 +590,7 @@ TEST(Serialization, serializes_ringct_types)
   rct::skpkGen(Sk, Pk);
   destinations.push_back(Pk);
   //compute rct data with mixin 500
-  s0 = rct::genRct(rct::zero(), sc, pc, destinations, amounts, amount_keys, 3);
+  s0 = rct::genRct(rct::zero(), sc, pc, destinations, amounts, amount_keys, NULL, NULL, 3);
 
   mg0 = s0.p.MGs[0];
   ASSERT_TRUE(serialization::dump_binary(mg0, blob));
@@ -789,7 +788,7 @@ TEST(Serialization, portability_wallet)
   }
 }
 
-#define OUTPUT_EXPORT_FILE_MAGIC "Edollar output export\003"
+#define OUTPUT_EXPORT_FILE_MAGIC "Monero output export\003"
 TEST(Serialization, portability_outputs)
 {
   // read file
@@ -802,12 +801,12 @@ TEST(Serialization, portability_outputs)
   // decrypt (copied from wallet2::decrypt)
   auto decrypt = [] (const std::string &ciphertext, const crypto::secret_key &skey, bool authenticated) -> string
   {
-    const size_t prefix_size = sizeof(chacha8_iv) + (authenticated ? sizeof(crypto::signature) : 0);
+    const size_t prefix_size = sizeof(chacha_iv) + (authenticated ? sizeof(crypto::signature) : 0);
     if(ciphertext.size() < prefix_size)
       return {};
-    crypto::chacha8_key key;
-    crypto::generate_chacha8_key(&skey, sizeof(skey), key);
-    const crypto::chacha8_iv &iv = *(const crypto::chacha8_iv*)&ciphertext[0];
+    crypto::chacha_key key;
+    crypto::generate_chacha_key(&skey, sizeof(skey), key);
+    const crypto::chacha_iv &iv = *(const crypto::chacha_iv*)&ciphertext[0];
     std::string plaintext;
     plaintext.resize(ciphertext.size() - prefix_size);
     if (authenticated)
@@ -905,10 +904,10 @@ TEST(Serialization, portability_outputs)
   ASSERT_TRUE(td2.m_pk_index == 0);
 }
 
-#define UNSIGNED_TX_PREFIX "Edollar unsigned tx set\003"
+#define UNSIGNED_TX_PREFIX "Monero unsigned tx set\003"
 TEST(Serialization, portability_unsigned_tx)
 {
-  const boost::filesystem::path filename = unit_test::data_dir / "unsigned_edollar_tx";
+  const boost::filesystem::path filename = unit_test::data_dir / "unsigned_monero_tx";
   std::string s;
   const bool testnet = true;
   bool r = epee::file_io_utils::load_file_to_string(filename.string(), s);
@@ -1053,10 +1052,10 @@ TEST(Serialization, portability_unsigned_tx)
   ASSERT_TRUE(td2.m_pk_index == 0);
 }
 
-#define SIGNED_TX_PREFIX "Edollar signed tx set\003"
+#define SIGNED_TX_PREFIX "Monero signed tx set\003"
 TEST(Serialization, portability_signed_tx)
 {
-  const boost::filesystem::path filename = unit_test::data_dir / "signed_edollar_tx";
+  const boost::filesystem::path filename = unit_test::data_dir / "signed_monero_tx";
   const bool testnet = true;
   std::string s;
   bool r = epee::file_io_utils::load_file_to_string(filename.string(), s);

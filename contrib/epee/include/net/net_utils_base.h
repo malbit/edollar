@@ -29,13 +29,11 @@
 #ifndef _NET_UTILS_BASE_H_
 #define _NET_UTILS_BASE_H_
 
-#include <boost/asio/io_service.hpp>
 #include <boost/uuid/uuid.hpp>
-#include <memory>
+#include <boost/asio/io_service.hpp>
 #include <typeinfo>
 #include <type_traits>
 #include "serialization/keyvalue_serialization.h"
-#include "string_tools.h"
 #include "misc_log_ex.h"
 
 #undef EDOLLAR_DEFAULT_LOG_CATEGORY
@@ -44,7 +42,6 @@
 #ifndef MAKE_IP
 #define MAKE_IP( a1, a2, a3, a4 )	(a1|(a2<<8)|(a3<<16)|(a4<<24))
 #endif
-
 
 namespace epee
 {
@@ -166,15 +163,37 @@ namespace net_utils
 
 		BEGIN_KV_SERIALIZE_MAP()
 			uint8_t type = is_store ? this_ref.get_type_id() : 0;
-			epee::serialization::selector<is_store>::serialize(type, stg, hparent_section, "type");
+			if (!epee::serialization::selector<is_store>::serialize(type, stg, hparent_section, "type"))
+				return false;
 			switch (type)
 			{
 				case ipv4_network_address::ID:
+				{
 					if (!is_store)
+					{
 						const_cast<network_address&>(this_ref) = ipv4_network_address{0, 0};
-					KV_SERIALIZE(template as_mutable<ipv4_network_address>());
+						auto &addr = this_ref.template as_mutable<ipv4_network_address>();
+						if (epee::serialization::selector<is_store>::serialize(addr, stg, hparent_section, "addr"))
+							MDEBUG("Found as addr: " << this_ref.str());
+						else if (epee::serialization::selector<is_store>::serialize(addr, stg, hparent_section, "template as<ipv4_network_address>()"))
+							MDEBUG("Found as template as<ipv4_network_address>(): " << this_ref.str());
+						else if (epee::serialization::selector<is_store>::serialize(addr, stg, hparent_section, "template as_mutable<ipv4_network_address>()"))
+							MDEBUG("Found as template as_mutable<ipv4_network_address>(): " << this_ref.str());
+						else
+						{
+							MWARNING("Address not found");
+							return false;
+						}
+					}
+					else
+					{
+						auto &addr = this_ref.template as_mutable<ipv4_network_address>();
+						if (!epee::serialization::selector<is_store>::serialize(addr, stg, hparent_section, "addr"))
+							return false;
+					}
 					break;
-				default: MERROR("Unsupported network address type: " << type); return false;
+				}
+				default: MERROR("Unsupported network address type: " << (unsigned)type); return false;
 			}
 		END_KV_SERIALIZE_MAP()
 	};
@@ -192,19 +211,8 @@ namespace net_utils
 	inline bool operator>=(const network_address& lhs, const network_address& rhs)
 	{ return !lhs.less(rhs); }
 
-	inline bool create_network_address(network_address &address, const std::string &string, uint16_t default_port = 0)
-	{
-		uint32_t ip;
-		uint16_t port;
-		if (epee::string_tools::parse_peer_from_string(ip, port, string))
-		{
-			if (default_port && !port)
-				port = default_port;
-			address = ipv4_network_address{ip, port};
-			return true;
-		}
-		return false;
-	}
+	bool create_network_address(network_address &address, const std::string &string, uint16_t default_port = 0);
+
 	/************************************************************************/
 	/*                                                                      */
 	/************************************************************************/
@@ -287,21 +295,8 @@ namespace net_utils
   //some helpers
 
 
-  inline 
-    std::string print_connection_context(const connection_context_base& ctx)
-  {
-    std::stringstream ss;
-    ss << ctx.m_remote_address.str() << " " << epee::string_tools::get_str_from_guid_a(ctx.m_connection_id) << (ctx.m_is_income ? " INC":" OUT");
-    return ss.str();
-  }
-
-  inline 
-    std::string print_connection_context_short(const connection_context_base& ctx)
-  {
-    std::stringstream ss;
-    ss << ctx.m_remote_address.str() << (ctx.m_is_income ? " INC":" OUT");
-    return ss.str();
-  }
+  std::string print_connection_context(const connection_context_base& ctx);
+  std::string print_connection_context_short(const connection_context_base& ctx);
 
 inline MAKE_LOGGABLE(connection_context_base, ct, os)
 {

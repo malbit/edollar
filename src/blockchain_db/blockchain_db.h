@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c)  2017, edollar project (fork from Monero)
 //
 // All rights reserved.
 //
@@ -37,7 +36,7 @@
 #include <boost/program_options.hpp>
 #include "common/command_line.h"
 #include "crypto/hash.h"
-#include "cryptonote_protocol/blobdatatype.h"
+#include "cryptonote_basic/blobdatatype.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/difficulty.h"
 #include "cryptonote_basic/hardfork.h"
@@ -148,8 +147,9 @@ struct txpool_tx_meta_t
   uint8_t kept_by_block;
   uint8_t relayed;
   uint8_t do_not_relay;
+  uint8_t double_spend_seen: 1;
 
-  uint8_t padding[77]; // till 192 bytes
+  uint8_t padding[76]; // till 192 bytes
 };
 
 #define DBF_SAFE       1
@@ -405,7 +405,7 @@ private:
   /**
    * @brief remove data about a transaction
    *
-   * The subclass implementing this will remove the transaction data 
+   * The subclass implementing this will remove the transaction data
    * for the passed transaction.  The data to be removed was added in
    * add_transaction_data().  Additionally, current subclasses have behavior
    * which requires the transaction itself as a parameter here.  Future
@@ -1265,7 +1265,7 @@ public:
    * @param outputs return-by-reference a list of outputs' metadata
    */
   virtual void get_output_key(const uint64_t &amount, const std::vector<uint64_t> &offsets, std::vector<output_data_t> &outputs, bool allow_partial = false) = 0;
-  
+
   /*
    * FIXME: Need to check with git blame and ask what this does to
    * document it
@@ -1315,7 +1315,7 @@ public:
   /**
    * @brief get the number of transactions in the txpool
    */
-  virtual uint64_t get_txpool_tx_count() const = 0;
+  virtual uint64_t get_txpool_tx_count(bool include_unrelayed_txes = true) const = 0;
 
   /**
    * @brief check whether a txid is in the txpool
@@ -1333,10 +1333,11 @@ public:
    * @brief get a txpool transaction's metadata
    *
    * @param txid the transaction id of the transation to lookup
+   * @param meta the metadata to return
    *
-   * @return the metadata associated with that transaction
+   * @return true if the tx meta was found, false otherwise
    */
-  virtual txpool_tx_meta_t get_txpool_tx_meta(const crypto::hash& txid) const = 0;
+  virtual bool get_txpool_tx_meta(const crypto::hash& txid, txpool_tx_meta_t &meta) const = 0;
 
   /**
    * @brief get a txpool transaction's blob
@@ -1370,7 +1371,7 @@ public:
    *
    * @return false if the function returns false for any transaction, otherwise true
    */
-  virtual bool for_all_txpool_txes(std::function<bool(const crypto::hash&, const txpool_tx_meta_t&, const cryptonote::blobdata*)>, bool include_blob = false) const = 0;
+  virtual bool for_all_txpool_txes(std::function<bool(const crypto::hash&, const txpool_tx_meta_t&, const cryptonote::blobdata*)>, bool include_blob = false, bool include_unrelayed_txes = true) const = 0;
 
   /**
    * @brief runs a function over all key images stored

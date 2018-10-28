@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -34,8 +33,6 @@
 #include "cryptonote_core/blockchain.h"
 
 using namespace cryptonote;
-
-const int CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2    = 60000; //for test only
 
 namespace
 {
@@ -113,11 +110,11 @@ namespace
   TEST_F(fee, double_at_full)
   {
     static const uint64_t block_rewards[] = {
-      20000000000000ull, // 20 edollar
+      20000000000000ull, // 20 monero
       13000000000000ull,
       1000000000000ull,
-      600000000000ull, // .6 edollar, minimum reward per block at 2min
-      300000000000ull, // .3 edollar, minimum reward per block at 1min
+      600000000000ull, // .6 monero, minimum reward per block at 2min
+      300000000000ull, // .3 monero, minimum reward per block at 1min
     };
     static const uint64_t median_block_sizes[] = {
       CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2,

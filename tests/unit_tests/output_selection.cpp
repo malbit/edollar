@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -77,7 +76,7 @@ TEST(select_outputs, one_out_of_N)
   tools::wallet2::transfer_container transfers = make_transfers_container(10);
   transfers[6].m_block_height = 700;
   std::vector<size_t> unused_indices({0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-  std::list<size_t> selected;
+  std::vector<size_t> selected;
   SELECT(2);
   PICK(6);
 }
@@ -94,7 +93,7 @@ TEST(select_outputs, order)
   transfers[3].m_block_height = 716;
   transfers[4].m_block_height = 701;
   std::vector<size_t> unused_indices({0, 1, 2, 3, 4});
-  std::list<size_t> selected;
+  std::vector<size_t> selected;
   SELECT(0);
   PICK(3); // first the one that's far away
   PICK(2); // then the one that's close

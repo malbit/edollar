@@ -1,4 +1,4 @@
-# Copyright (c)  2017, edollar project (fork from Monero)
+# Copyright (c) 2014-2018, The Monero Project
 #
 # All rights reserved.
 #
@@ -39,6 +39,7 @@ add_executable(libwallet_api_tests
 
 target_link_libraries(libwallet_api_tests
   PRIVATE
+    wallet_api
     wallet
     version
     epee

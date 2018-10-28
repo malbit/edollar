@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -34,8 +33,6 @@
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 
 using namespace cryptonote;
-
-const int CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V1 = 20000;
 
 namespace
 {

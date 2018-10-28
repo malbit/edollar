@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -32,7 +31,9 @@
 #include "gtest/gtest.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "p2p/net_node.h"
+#include "p2p/net_node.inl"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
+#include "cryptonote_protocol/cryptonote_protocol_handler.inl"
 
 #define MAKE_IPV4_ADDRESS(a,b,c,d) epee::net_utils::ipv4_network_address{MAKE_IP(a,b,c,d),0}
 
@@ -80,6 +81,7 @@ public:
   cryptonote::difficulty_type get_block_cumulative_difficulty(uint64_t height) const { return 0; }
   bool fluffy_blocks_enabled() const { return false; }
   uint64_t prevalidate_block_hashes(uint64_t height, const std::list<crypto::hash> &hashes) { return 0; }
+  void stop() {}
 };
 
 typedef nodetool::node_server<cryptonote::t_cryptonote_protocol_handler<test_core>> Server;
@@ -185,3 +187,5 @@ TEST(ban, add)
   ASSERT_TRUE(t >= 4);
 }
 
+namespace nodetool { template class node_server<cryptonote::t_cryptonote_protocol_handler<test_core>>; }
+namespace cryptonote { template class t_cryptonote_protocol_handler<test_core>; }

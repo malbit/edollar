@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -39,6 +38,11 @@
 #include <functional>
 #include <memory>
 #include <string>
+
+#ifdef _WIN32
+#include "windows.h"
+#include "misc_log_ex.h"
+#endif
 
 #include "crypto/hash.h"
 
@@ -149,9 +153,10 @@ namespace tools
       }
       return r;
 #else
-      /* Only blocks SIGINT and SIGTERM */
+      /* Only blocks SIGINT, SIGTERM and SIGPIPE */
       signal(SIGINT, posix_handler);
       signal(SIGTERM, posix_handler);
+      signal(SIGPIPE, SIG_IGN);
       m_handler = t;
       return true;
 #endif

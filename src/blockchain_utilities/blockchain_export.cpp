@@ -1,5 +1,4 @@
-// Copyright (c) 2017-2018, The EDollar Project
-// Copyright (c) 2014-2017, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 //
 // All rights reserved.
 //
@@ -31,6 +30,7 @@
 #include "blocksdat_file.h"
 #include "common/command_line.h"
 #include "cryptonote_core/tx_pool.h"
+#include "cryptonote_core/cryptonote_core.h"
 #include "blockchain_db/blockchain_db.h"
 #include "blockchain_db/db_types.h"
 #include "version.h"
@@ -67,21 +67,16 @@ int main(int argc, char* argv[])
   const command_line::arg_descriptor<std::string> arg_output_file = {"output-file", "Specify output file", "", true};
   const command_line::arg_descriptor<std::string> arg_log_level  = {"log-level",  "0-4 or categories", ""};
   const command_line::arg_descriptor<uint64_t> arg_block_stop = {"block-stop", "Stop at block number", block_stop};
-  const command_line::arg_descriptor<bool>     arg_testnet_on = {
-    "testnet"
-      , "Run on testnet."
-      , false
-  };
   const command_line::arg_descriptor<std::string> arg_database = {
     "database", available_dbs.c_str(), default_db_type
   };
   const command_line::arg_descriptor<bool> arg_blocks_dat = {"blocksdat", "Output in blocks.dat format", blocks_dat};
 
 
-  command_line::add_arg(desc_cmd_sett, command_line::arg_data_dir, default_data_path.string());
-  command_line::add_arg(desc_cmd_sett, command_line::arg_testnet_data_dir, default_testnet_data_path.string());
+  command_line::add_arg(desc_cmd_sett, cryptonote::arg_data_dir, default_data_path.string());
+  command_line::add_arg(desc_cmd_sett, cryptonote::arg_testnet_data_dir, default_testnet_data_path.string());
   command_line::add_arg(desc_cmd_sett, arg_output_file);
-  command_line::add_arg(desc_cmd_sett, arg_testnet_on);
+  command_line::add_arg(desc_cmd_sett, cryptonote::arg_testnet_on);
   command_line::add_arg(desc_cmd_sett, arg_log_level);
   command_line::add_arg(desc_cmd_sett, arg_database);
   command_line::add_arg(desc_cmd_sett, arg_block_stop);
@@ -104,12 +99,12 @@ int main(int argc, char* argv[])
 
   if (command_line::get_arg(vm, command_line::arg_help))
   {
-    std::cout << "Edollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL << ENDL;
+    std::cout << "eDollar '" << EDOLLAR_RELEASE_NAME << "' (v" << EDOLLAR_VERSION_FULL << ")" << ENDL << ENDL;
     std::cout << desc_options << std::endl;
     return 1;
   }
 
-  mlog_configure(mlog_get_default_log_path("edollar-blockchain-export.log"), true);
+  mlog_configure(mlog_get_default_log_path("monero-blockchain-export.log"), true);
   if (!command_line::is_arg_defaulted(vm, arg_log_level))
     mlog_set_log(command_line::get_arg(vm, arg_log_level).c_str());
   else
@@ -118,12 +113,12 @@ int main(int argc, char* argv[])
 
   LOG_PRINT_L0("Starting...");
 
-  bool opt_testnet = command_line::get_arg(vm, arg_testnet_on);
+  bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_blocks_dat = command_line::get_arg(vm, arg_blocks_dat);
 
   std::string m_config_folder;
 
-  auto data_dir_arg = opt_testnet ? command_line::arg_testnet_data_dir : command_line::arg_data_dir;
+  auto data_dir_arg = opt_testnet ? cryptonote::arg_testnet_data_dir : cryptonote::arg_data_dir;
   m_config_folder = command_line::get_arg(vm, data_dir_arg);
 
   std::string db_type = command_line::get_arg(vm, arg_database);
