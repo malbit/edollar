@@ -980,9 +980,9 @@ difficulty_type Blockchain::get_next_difficulty_for_alternative_chain(const std:
   }
 
   if (version == 1) {
-    return next_difficulty(timestamps, difficulties, DIFFICULTY_TARGET_V1);
+    return next_difficulty(timestamps, cumulative_difficulties, DIFFICULTY_TARGET_V1);
   } else {
-    return next_difficulty_v2(timestamps, difficulties);
+    return next_difficulty_v2(timestamps, cumulative_difficulties);
   }
 }
 //------------------------------------------------------------------

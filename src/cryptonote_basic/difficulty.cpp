@@ -169,13 +169,13 @@ namespace cryptonote {
 
   // difficulty_type should be uint64_t
   difficulty_type next_difficulty_v2(std::vector<uint64_t> timestamps,
-      std::vector<difficulty_type> difficulties) {
+      std::vector<difficulty_type> cumulative_difficulties) {
 
       uint64_t  T = DIFFICULTY_TARGET_V2;
       uint64_t  N = DIFFICULTY_WINDOW_V2; // N=45, 60, and 90 for T=600, 120, 60.
       uint64_t  L(0), ST, sum_3_ST(0), next_D, prev_D, this_timestamp, previous_timestamp;
 
-      assert(timestamps.size() == difficulties.size() &&
+      assert(timestamps.size() == cumulative_difficulties.size() &&
                      timestamps.size() <= N+1 );
 
       // If it's a new coin, do startup code.
@@ -199,9 +199,9 @@ namespace cryptonote {
         if ( i > N-3 ) { sum_3_ST += ST; }
       }
 
-      next_D = ((difficulties[N] - difficulties[0])*T*(N+1)*99)/(100*2*L);
+      next_D = ((cumulative_difficulties[N] - cumulative_difficulties[0])*T*(N+1)*99)/(100*2*L);
 
-      prev_D = difficulties[N] - difficulties[N-1];
+      prev_D = cumulative_difficulties[N] - cumulative_difficulties[N-1];
       next_D = std::max((prev_D*67)/100, std::min(next_D, (prev_D*150)/100));
 
       if ( sum_3_ST < (8*T)/10) {  next_D = std::max(next_D,(prev_D*108)/100); }
