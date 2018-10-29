@@ -70,6 +70,7 @@ struct PendingTransaction
     };
 
     enum Priority {
+        Priority_Default = 0,
         Priority_Low = 1,
         Priority_Medium = 2,
         Priority_High = 3,
@@ -103,13 +104,6 @@ struct UnsignedTransaction
         Status_Ok,
         Status_Error,
         Status_Critical
-    };
-
-    enum Priority {
-        Priority_Low = 1,
-        Priority_Medium = 2,
-        Priority_High = 3,
-        Priority_Last
     };
 
     virtual ~UnsignedTransaction() = 0;

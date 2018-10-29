@@ -637,6 +637,13 @@ namespace cryptonote
     uint64_t get_current_cumulative_blocksize_limit() const;
 
     /**
+     * @brief gets the blocksize median based on recent blocks (same window as for the limit)
+     *
+     * @return the median
+     */
+    uint64_t get_current_cumulative_blocksize_median() const;
+
+    /**
      * @brief gets the difficulty of the block with a given height
      *
      * @param i the height
@@ -792,7 +799,7 @@ namespace cryptonote
      * @param earliest_height the earliest height at which <version> is allowed
      * @param voting which version this node is voting for/using
      *
-     * @return whether the version queried is enabled 
+     * @return whether the version queried is enabled
      */
     bool get_hard_fork_voting_info(uint8_t version, uint32_t &window, uint32_t &votes, uint32_t &threshold, uint64_t &earliest_height, uint8_t &voting) const;
 
@@ -962,6 +969,7 @@ namespace cryptonote
     // main chain
     transactions_container m_transactions;
     size_t m_current_block_cumul_sz_limit;
+    size_t m_current_block_cumul_sz_median;
 
     // metadata containers
     std::unordered_map<crypto::hash, std::unordered_map<crypto::key_image, std::vector<output_data_t>>> m_scan_table;

@@ -262,6 +262,8 @@ namespace nodetool
       const boost::program_options::variables_map& vm
     )
   {
+    m_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
+
     auto p2p_bind_arg = m_testnet ? arg_testnet_p2p_bind_port : arg_p2p_bind_port;
 
     m_bind_ip = command_line::get_arg(vm, arg_p2p_bind_ip);
@@ -389,14 +391,16 @@ namespace nodetool
   bool node_server<t_payload_net_handler>::init(const boost::program_options::variables_map& vm)
   {
     std::set<std::string> full_addrs;
-    m_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
+
+    bool res = handle_command_line(vm);
+    CHECK_AND_ASSERT_MES(res, false, "Failed to handle command line");
 
     if (m_testnet)
     {
       memcpy(&m_network_id, &::config::testnet::NETWORK_ID, 16);
       full_addrs = get_seed_nodes(true);
     }
-    else
+    else if (m_exclusive_peers.empty())
     {
       memcpy(&m_network_id, &::config::NETWORK_ID, 16);
       // for each hostname in the seed nodes list, attempt to DNS resolve and
@@ -486,9 +490,6 @@ namespace nodetool
       append_net_address(m_seed_nodes, full_addr);
     }
     MDEBUG("Number of seed nodes: " << m_seed_nodes.size());
-
-    bool res = handle_command_line(vm);
-    CHECK_AND_ASSERT_MES(res, false, "Failed to handle command line");
 
     auto config_arg = m_testnet ? cryptonote::arg_testnet_data_dir : cryptonote::arg_data_dir;
     m_config_folder = command_line::get_arg(vm, config_arg);
@@ -1101,7 +1102,7 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::connect_to_seed()
   {
-      if (m_seed_nodes.empty() || m_offline)
+      if (m_seed_nodes.empty() || m_offline || !m_exclusive_peers.empty())
         return true;
 
       size_t try_count = 0;
