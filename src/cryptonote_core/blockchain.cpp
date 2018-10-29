@@ -1124,7 +1124,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
   b.timestamp = time(NULL);
 
   uint8_t version = get_current_hard_fork_version();
-  uint64_t blockchain_timestamp_check_window = version =< 2 ? BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW : BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW_V2;
+  uint64_t blockchain_timestamp_check_window = version >= 2 ? BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW_V2 : BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW;
 
   if(m_db->height() >= blockchain_timestamp_check_window) {
     std::vector<uint64_t> timestamps;
@@ -1280,7 +1280,7 @@ bool Blockchain::complete_timestamps_vector(uint64_t start_top_height, std::vect
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
 
-  size_t blockchain_timestamp_check_window = get_current_hard_fork_version() =< 2 ? BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW : BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW_V2;
+  size_t blockchain_timestamp_check_window = get_current_hard_fork_version() >= 2 ? BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW_V2 : BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW;
   if(timestamps.size() >= blockchain_timestamp_check_window)
     return true;
 
@@ -2955,7 +2955,7 @@ bool Blockchain::is_tx_spendtime_unlocked(uint64_t unlock_time) const
   {
     //interpret as time
     uint64_t current_time = static_cast<uint64_t>(time(NULL));
-    if(current_time + (get_current_hard_fork_version() =< 2 ? CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V1 : CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2) >= unlock_time)
+    if(current_time + (get_current_hard_fork_version() >= 2 ? CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2 : CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V1) >= unlock_time)
       return true;
     else
       return false;
