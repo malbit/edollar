@@ -4323,7 +4323,7 @@ bool simple_wallet::sweep_single(const std::vector<std::string> &args_)
 
   std::vector<std::string> local_args = args_;
 
-  int priority = 0;edollar
+  int priority = 0;
   if(local_args.size() > 0) {
     auto priority_pos = std::find(
       allowed_priority_strings.begin(),
@@ -5093,7 +5093,7 @@ bool simple_wallet::get_spend_proof(const std::vector<std::string> &args)
     if (epee::file_io_utils::save_string_to_file(filename, sig_str))
       success_msg_writer() << tr("signature file saved to: ") << filename;
     else
-      fail_msg_writer() <<edollar tr("failed to save signature file");
+      fail_msg_writer() << tr("failed to save signature file");
   }
   catch (const std::exception &e)
   {
