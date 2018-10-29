@@ -762,7 +762,7 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
     for (; offset < height; offset++)
     {
       timestamps.push_back(m_db->get_block_timestamp(offset));
-      cumulative_difficulties.push_back(m_db->get_block_cumulative_difficulty(offset));
+      difficulties.push_back(m_db->get_block_cumulative_difficulty(offset));
     }
 
     m_timestamps_and_difficulties_height = height;
@@ -921,6 +921,7 @@ difficulty_type Blockchain::get_next_difficulty_for_alternative_chain(const std:
   LOG_PRINT_L3("Blockchain::" << __func__);
   std::vector<uint64_t> timestamps;
   std::vector<difficulty_type> cumulative_difficulties;
+  size_t difficulty_blocks_count;
   uint8_t version = get_current_hard_fork_version();
   if (version == 1) {
     difficulty_blocks_count = DIFFICULTY_BLOCKS_COUNT;
