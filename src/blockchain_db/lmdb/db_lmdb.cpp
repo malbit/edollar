@@ -338,6 +338,12 @@ mdb_txn_safe::~mdb_txn_safe()
   num_active_txns--;
 }
 
+void mdb_txn_safe::uncheck()
+{
+  num_active_txns--;
+  m_check = false;
+}
+
 void mdb_txn_safe::commit(std::string message)
 {
   if (message.size() == 0)
@@ -1074,13 +1080,12 @@ BlockchainLMDB::~BlockchainLMDB()
     close();
 }
 
-BlockchainLMDB::BlockchainLMDB(bool batch_transactions)
+BlockchainLMDB::BlockchainLMDB(bool batch_transactions): BlockchainDB()
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
   // initialize folder to something "safe" just in case
   // someone accidentally misuses this class...
   m_folder = "thishsouldnotexistbecauseitisgibberish";
-  m_open = false;
 
   m_batch_transactions = batch_transactions;
   m_write_txn = nullptr;
@@ -1439,9 +1444,10 @@ void BlockchainLMDB::unlock()
 #define TXN_PREFIX_RDONLY() \
   MDB_txn *m_txn; \
   mdb_txn_cursors *m_cursors; \
+  mdb_txn_safe auto_txn; \
   bool my_rtxn = block_rtxn_start(&m_txn, &m_cursors); \
-  mdb_txn_safe auto_txn(my_rtxn); \
-  if (my_rtxn) auto_txn.m_tinfo = m_tinfo.get()
+  if (my_rtxn) auto_txn.m_tinfo = m_tinfo.get(); \
+  else auto_txn.uncheck()
 #define TXN_POSTFIX_RDONLY()
 
 #define TXN_POSTFIX_SUCCESS() \
@@ -3140,8 +3146,12 @@ void BlockchainLMDB::drop_hard_fork_info()
 
   TXN_PREFIX(0);
 
-  mdb_drop(*txn_ptr, m_hf_starting_heights, 1);
-  mdb_drop(*txn_ptr, m_hf_versions, 1);
+  auto result = mdb_drop(*txn_ptr, m_hf_starting_heights, 1);
+  if (result)
+    throw1(DB_ERROR(lmdb_error("Error dropping hard fork starting heights db: ", result).c_str()));
+  result = mdb_drop(*txn_ptr, m_hf_versions, 1);
+  if (result)
+    throw1(DB_ERROR(lmdb_error("Error dropping hard fork versions db: ", result).c_str()));
 
   TXN_POSTFIX_SUCCESS();
 }

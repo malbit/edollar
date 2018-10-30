@@ -1,21 +1,21 @@
 // Copyright (c) 2014-2018, The Monero Project
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -25,9 +25,10 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <unistd.h>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -42,6 +43,18 @@
 #include "warnings.h"
 #include "crypto.h"
 #include "hash.h"
+
+namespace {
+  static void local_abort(const char *msg)
+  {
+    fprintf(stderr, "%s\n", msg);
+#ifdef NDEBUG
+    _exit(1);
+#else
+    abort();
+#endif
+  }
+}
 
 namespace crypto {
 
@@ -92,10 +105,10 @@ namespace crypto {
     sc_reduce32(&res);
   }
 
-  /* 
+  /*
    * generate public and secret keys from a random 256-bit integer
    * TODO: allow specifiying random value (for wallet recovery)
-   * 
+   *
    */
   secret_key crypto_ops::generate_keys(public_key &pub, secret_key &sec, const secret_key& recovery_key, bool recover) {
     ge_p3 point;
@@ -305,7 +318,7 @@ namespace crypto {
     // pick random k
     ec_scalar k;
     random_scalar(k);
-    
+
     s_comm_2 buf;
     buf.msg = prefix_hash;
     buf.D = D;
@@ -324,7 +337,7 @@ namespace crypto {
       ge_scalarmult_base(&X_p3, &k);
       ge_p3_tobytes(&buf.X, &X_p3);
     }
-    
+
     // compute Y = k*A
     ge_p2 Y_p2;
     ge_scalarmult(&Y_p2, &k, &A_p3);
@@ -467,7 +480,7 @@ POP_WARNINGS
     ec_scalar sum, k, h;
     boost::shared_ptr<rs_comm> buf(reinterpret_cast<rs_comm *>(malloc(rs_comm_size(pubs_count))), free);
     if (!buf)
-      abort();
+      local_abort("malloc failure");
     assert(sec_index < pubs_count);
 #if !defined(NDEBUG)
     {
@@ -486,7 +499,7 @@ POP_WARNINGS
     }
 #endif
     if (ge_frombytes_vartime(&image_unp, &image) != 0) {
-      abort();
+      local_abort("invalid key image");
     }
     ge_dsm_precomp(image_pre, &image_unp);
     sc_0(&sum);
@@ -505,7 +518,7 @@ POP_WARNINGS
         random_scalar(sig[i].c);
         random_scalar(sig[i].r);
         if (ge_frombytes_vartime(&tmp3, &*pubs[i]) != 0) {
-          abort();
+          local_abort("invalid pubkey");
         }
         ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);
         ge_tobytes(&buf->ab[i].a, &tmp2);
