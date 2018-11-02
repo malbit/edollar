@@ -1,21 +1,21 @@
 // Copyright (c) 2014-2018, The Monero Project
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -69,8 +69,7 @@ public:
   std::string get_config_subdir() const
   {
     bool testnet = command_line::get_arg(m_vm_HACK, cryptonote::arg_testnet_on);
-    auto p2p_bind_arg = testnet ? nodetool::arg_testnet_p2p_bind_port : nodetool::arg_p2p_bind_port;
-    std::string port = command_line::get_arg(m_vm_HACK, p2p_bind_arg);
+    std::string port = command_line::get_arg(m_vm_HACK, nodetool::arg_p2p_bind_port);
     if ((!testnet && port != std::to_string(::config::P2P_DEFAULT_PORT))
         || (testnet && port != std::to_string(::config::testnet::P2P_DEFAULT_PORT))) {
       return port;

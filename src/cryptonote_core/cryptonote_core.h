@@ -58,8 +58,7 @@ namespace cryptonote
      const std::pair<uint8_t, uint64_t> *hard_forks;
    };
 
-  extern const command_line::arg_descriptor<std::string> arg_data_dir;
-  extern const command_line::arg_descriptor<std::string> arg_testnet_data_dir;
+  extern const command_line::arg_descriptor<std::string, false, true> arg_data_dir;
   extern const command_line::arg_descriptor<bool, false> arg_testnet_on;
   extern const command_line::arg_descriptor<bool> arg_offline;
 
@@ -165,7 +164,7 @@ namespace cryptonote
       * @note see Blockchain::cleanup_handle_incoming_blocks
       */
      bool cleanup_handle_incoming_blocks(bool force_sync = false);
-     	     	
+
      /**
       * @brief check the size of a block against the current maximum
       *
@@ -438,7 +437,7 @@ namespace cryptonote
       * @note see tx_memory_pool::get_txpool_backlog
       */
      bool get_txpool_backlog(std::vector<tx_backlog_entry>& backlog) const;
-     
+
      /**
       * @copydoc tx_memory_pool::get_transactions
       * @param include_unrelayed_txes include unrelayed txes in result
@@ -724,12 +723,12 @@ namespace cryptonote
       * @return the number of blocks to sync in one go
       */
      std::pair<uint64_t, uint64_t> get_coinbase_tx_sum(const uint64_t start_offset, const size_t count);
-     
+
      /**
       * @brief get whether we're on testnet or not
       *
       * @return are we on testnet?
-      */     
+      */
      bool get_testnet() const { return m_testnet; };
 
      /**
