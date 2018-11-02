@@ -1216,7 +1216,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
               td.m_rct = false;
             }
 	    set_unspent(m_transfers.size()-1);
-            if (!m_multisig)
+            if (!m_multisig && !m_watch_only))
 	      m_key_images[td.m_key_image] = m_transfers.size()-1;
 	    m_pub_keys[tx_scan_info[o].in_ephemeral.pub] = m_transfers.size()-1;
             if (m_multisig)
@@ -1310,11 +1310,21 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       uint64_t amount = boost::get<cryptonote::txin_to_key>(in).amount;
       if (amount > 0)
       {
-        THROW_WALLET_EXCEPTION_IF(amount != td.amount(), error::wallet_internal_error,
-            std::string("Inconsistent amount in tx input: got ") + print_money(amount) +
-            std::string(", expected ") + print_money(td.amount()));
+        if(amount != td.amount())
+        {
+          MERROR("Inconsistent amount in tx input: got " << print_money(amount) <<
+            ", expected " << print_money(td.amount()));
+          // this means:
+          //   1) the same output pub key was used as destination multiple times,
+          //   2) the wallet set the highest amount among them to transfer_details::m_amount, and
+          //   3) the wallet somehow spent that output with an amount smaller than the above amount, causing inconsistency
+          td.m_amount = amount;
+        }
       }
-      amount = td.amount();
+      else
+      {
+        amount = td.amount();
+      }
       tx_money_spent_in_ins += amount;
       if (subaddr_account && *subaddr_account != td.m_subaddr_index.major)
         LOG_ERROR("spent funds are from different subaddress accounts; count of incoming/outgoing payments will be incorrect");
@@ -2632,8 +2642,8 @@ bool wallet2::load_keys(const std::string& keys_file_name, const epee::wipeable_
     m_confirm_backlog_threshold = field_confirm_backlog_threshold;
     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, confirm_export_overwrite, int, Int, false, true);
     m_confirm_export_overwrite = field_confirm_export_overwrite;
-    GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, m_auto_low_priority, int, Int, false, true);
-    m_auto_low_priority = field_m_auto_low_priority;
+    GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, auto_low_priority, int, Int, false, true);
+    m_auto_low_priority = field_auto_low_priority;
     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, testnet, int, Int, false, m_testnet);
     // Wallet is being opened with testnet flag, but is saved as a mainnet wallet
     THROW_WALLET_EXCEPTION_IF(m_testnet && !field_testnet, error::wallet_internal_error, "Mainnet wallet can not be opened as testnet wallet");
