@@ -886,14 +886,12 @@ void wallet2::expand_subaddresses(const cryptonote::subaddress_index& index)
     cryptonote::subaddress_index index2;
     for (index2.major = m_subaddress_labels.size(); index2.major < index.major + m_subaddress_lookahead_major; ++index2.major)
     {
-      for (index2.minor = 0; index2.minor < (index2.major == index.major ? index.minor : 0) + m_subaddress_lookahead_minor; ++index2.minor)
+      const uint32_t end = (index2.major == index.major ? index.minor : 0) + m_subaddress_lookahead_minor;
+      const std::vector<crypto::public_key> pkeys = cryptonote::get_subaddress_spend_public_keys(m_account.get_keys(), index2.major, 0, end);
+      for (index2.minor = 0; index2.minor < end; ++index2.minor)
       {
-        if (m_subaddresses_inv.count(index2) == 0)
-        {
-          crypto::public_key D = get_subaddress_spend_public_key(index2);
-          m_subaddresses[D] = index2;
-          m_subaddresses_inv[index2] = D;
-        }
+         const crypto::public_key &D = pkeys[index2.minor];
+         m_subaddresses[D] = index2;
       }
     }
     m_subaddress_labels.resize(index.major + 1, {"Untitled account"});
@@ -902,15 +900,14 @@ void wallet2::expand_subaddresses(const cryptonote::subaddress_index& index)
   else if (m_subaddress_labels[index.major].size() <= index.minor)
   {
     // add new subaddresses
-    cryptonote::subaddress_index index2 = index;
-    for (index2.minor = m_subaddress_labels[index.major].size(); index2.minor < index.minor + m_subaddress_lookahead_minor; ++index2.minor)
+    const uint32_t end = index.minor + m_subaddress_lookahead_minor;
+    const uint32_t begin = m_subaddress_labels[index.major].size();
+    cryptonote::subaddress_index index2 = {index.major, begin};
+    const std::vector<crypto::public_key> pkeys = cryptonote::get_subaddress_spend_public_keys(m_account.get_keys(), index2.major, index2.minor, end);
+    for (; index2.minor < end; ++index2.minor)
     {
-      if (m_subaddresses_inv.count(index2) == 0)
-      {
-        crypto::public_key D = get_subaddress_spend_public_key(index2);
-        m_subaddresses[D] = index2;
-        m_subaddresses_inv[index2] = D;
-      }
+       const crypto::public_key &D = pkeys[index2.minor - begin];
+       m_subaddresses[D] = index2;
     }
     m_subaddress_labels[index.major].resize(index.minor + 1);
   }
@@ -2350,7 +2347,6 @@ bool wallet2::clear()
   m_address_book.clear();
   m_local_bc_height = 1;
   m_subaddresses.clear();
-  m_subaddresses_inv.clear();
   m_subaddress_labels.clear();
   return true;
 }
@@ -2854,16 +2850,9 @@ crypto::secret_key wallet2::generate(const std::string& wallet_, const epee::wip
   m_multisig_threshold = 0;
   m_multisig_signers.clear();
 
-  // -1 month for fluctuations in block time and machine date/time setup.
-  // avg seconds per block
-  const int seconds_per_block = DIFFICULTY_TARGET_V2;
-  // ~num blocks per month
-  const uint64_t blocks_per_month = 60*60*24*30/seconds_per_block;
-
-  // try asking the daemon first
+  // calculate a starting refresh height
   if(m_refresh_from_block_height == 0 && !recover){
-    uint64_t height = estimate_blockchain_height();
-    m_refresh_from_block_height = height >= blocks_per_month ? height - blocks_per_month : 0;
+    m_refresh_from_block_height = estimate_blockchain_height();
   }
 
   if (!wallet_.empty())
@@ -2910,8 +2899,16 @@ crypto::secret_key wallet2::generate(const std::string& wallet_, const epee::wip
    // the daemon is currently syncing.
    height = get_approximate_blockchain_height();
    uint64_t target_height = get_daemon_blockchain_target_height(err);
-   if (err.empty() && target_height < height)
-     height = target_height;
+   if (err.empty()) {
+     if (target_height < height)
+       height = target_height;
+   } else {
+     // if we couldn't talk to the daemon, check safety margin.
+     if (height > blocks_per_month)
+       height -= blocks_per_month;
+     else
+       height = 0;
+   }
    uint64_t local_height = get_daemon_blockchain_height(err);
    if (err.empty() && local_height > height)
      height = local_height;
@@ -3192,7 +3189,6 @@ bool wallet2::finalize_multisig(const epee::wipeable_string &password, std::unor
   }
 
   m_subaddresses.clear();
-  m_subaddresses_inv.clear();
   m_subaddress_labels.clear();
   add_subaddress_account(tr("Primary account"));
 

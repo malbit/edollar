@@ -1,21 +1,21 @@
 // Copyright (c) 2014-2018, The Monero Project
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -25,7 +25,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -46,7 +46,7 @@ namespace command_line
   //! \return True if `str` is `is_iequal("n" || "no" || `tr("no"))`.
   bool is_no(const std::string& str);
 
-  template<typename T, bool required = false>
+  template<typename T, bool required = false, bool dependent = false>
   struct arg_descriptor;
 
   template<typename T>
@@ -78,6 +78,23 @@ namespace command_line
 
     const char* name;
     const char* description;
+
+    template<typename T>
+  struct arg_descriptor<T, false, true>
+  {
+    typedef T value_type;
+
+    const char* name;
+    const char* description;
+
+    const arg_descriptor<bool, false>& ref;
+
+    T true_default_value;
+    T false_default_value;
+
+    bool not_use_default;
+
+  };
   };
 
   template<typename T>
@@ -93,6 +110,24 @@ namespace command_line
     if (!arg.not_use_default)
       semantic->default_value(arg.default_value);
     return semantic;
+
+    template<typename T>
+  boost::program_options::typed_value<T, char>* make_semantic(const arg_descriptor<T, false, true>& arg)
+  {
+    auto semantic = boost::program_options::value<T>();
+    if (!arg.not_use_default) {
+      if (arg.ref.default_value)
+      {
+        semantic->default_value(arg.true_default_value);
+      }
+      else
+      {
+        semantic->default_value(arg.false_default_value);
+      }
+    }
+    return semantic;
+
+  }
   }
 
   template<typename T>
@@ -112,8 +147,8 @@ namespace command_line
     return semantic;
   }
 
-  template<typename T, bool required>
-  void add_arg(boost::program_options::options_description& description, const arg_descriptor<T, required>& arg, bool unique = true)
+  template<typename T, bool required, bool dependent>
+  void add_arg(boost::program_options::options_description& description, const arg_descriptor<T, required, dependent>& arg, bool unique = true)
   {
     if (0 != description.find_nothrow(arg.name, false))
     {
@@ -189,25 +224,31 @@ namespace command_line
     return !value.empty();
   }
 
-  template<typename T, bool required>
-  bool is_arg_defaulted(const boost::program_options::variables_map& vm, const arg_descriptor<T, required>& arg)
+  template<typename T, bool required, bool dependent>
+  bool is_arg_defaulted(const boost::program_options::variables_map& vm, const arg_descriptor<T, required, dependent>& arg)
   {
     return vm[arg.name].defaulted();
   }
 
+  template<typename T, bool required>
+  T get_arg(const boost::program_options::variables_map& vm, const arg_descriptor<T, required, true>& arg)
+  {
+    if (is_arg_defaulted(vm, arg) && !is_arg_defaulted(vm, arg.ref))
+      return get_arg(vm, arg.ref) ? arg.true_default_value : arg.false_default_value;
+    return vm[arg.name].template as<T>();
+  }
 
   template<typename T, bool required>
   T get_arg(const boost::program_options::variables_map& vm, const arg_descriptor<T, required>& arg)
   {
     return vm[arg.name].template as<T>();
   }
- 
+
   template<>
   inline bool has_arg<bool, false>(const boost::program_options::variables_map& vm, const arg_descriptor<bool, false>& arg)
   {
     return get_arg<bool, false>(vm, arg);
   }
-
 
   extern const arg_descriptor<bool> arg_help;
   extern const arg_descriptor<bool> arg_version;
