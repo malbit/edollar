@@ -81,8 +81,9 @@ namespace command_line
 
     const char* name;
     const char* description;
+  };
 
-    template<typename T>
+  template<typename T>
   struct arg_descriptor<T, false, true>
   {
     typedef T value_type;
