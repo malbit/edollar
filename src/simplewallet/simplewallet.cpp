@@ -64,6 +64,11 @@
 #include "wallet/wallet_args.h"
 #include <stdexcept>
 
+#ifdef WIN32
+#include <boost/locale.hpp>
+#include <boost/filesystem.hpp>
+#endif
+
 #ifdef HAVE_READLINE
 #include "readline_buffer.h"
 #endif
@@ -130,6 +135,16 @@ namespace
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
 
+#ifdef WIN32
+  static std::string cp850_to_utf8(const std::string &cp850_str)
+  {
+    boost::locale::generator gen;
+    gen.locale_cache_enabled(true);
+    std::locale loc = gen("en_US.CP850");
+    return boost::locale::conv::to_utf<char>(cp850_str, loc);
+  }
+#endif
+
   std::string input_line(const std::string& prompt)
   {
 #ifdef HAVE_READLINE
@@ -139,6 +154,9 @@ namespace
 
     std::string buf;
     std::getline(std::cin, buf);
+#ifdef WIN32
+    buf = cp850_to_utf8(buf);
+#endif
 
     return epee::string_tools::trim(buf);
   }
@@ -561,10 +579,7 @@ bool simple_wallet::print_seed(bool encrypted)
   epee::wipeable_string seed_pass;
   if (encrypted)
   {
-#ifdef HAVE_READLINE
-    rdln::suspend_readline pause_readline;
-#endif
-    auto pwd_container = tools::password_container::prompt(true, tr("Enter optional seed encryption passphrase, empty to see raw seed"));
+    auto pwd_container = password_prompter(tr("Enter optional seed encryption passphrase, empty to see raw seed"), true);
     if (std::cin.eof() || !pwd_container)
       return true;
     seed_pass = pwd_container->password();
@@ -2143,10 +2158,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
         }
       }
 
-#ifdef HAVE_READLINE
-    rdln::suspend_readline pause_readline;
-#endif
-      auto pwd_container = tools::password_container::prompt(false, tr("Enter seed encryption passphrase, empty if none"));
+      auto pwd_container = password_prompter(tr("Enter seed encryption passphrase, empty if none"), false);
       if (std::cin.eof() || !pwd_container)
         return false;
       epee::wipeable_string seed_pass = pwd_container->password();
@@ -2405,7 +2417,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
         // get N secret spend keys from user
         for(unsigned int i=0; i<multisig_n; ++i)
         {
-          spendkey_string = input_line(tr((boost::format(tr("Secret spend key (%u of %u):")) % (i+i) % multisig_m).str().c_str()));
+          spendkey_string = input_line(tr((boost::format(tr("Secret spend key (%u of %u):")) % (i+1) % multisig_m).str().c_str()));
           if (std::cin.eof())
             return false;
           if (spendkey_string.empty())
@@ -2729,7 +2741,7 @@ bool simple_wallet::new_wallet(const boost::program_options::variables_map& vm,
   // a seed language is not already specified AND
   // (it is not a wallet restore OR if it was a deprecated wallet
   // that was earlier used before this restore)
-  if ((!two_random) && (mnemonic_language.empty()) && (!m_restore_deterministic_wallet || was_deprecated_wallet))
+  if ((!two_random) && (mnemonic_language.empty() || mnemonic_language == crypto::ElectrumWords::old_language_name) && (!m_restore_deterministic_wallet || was_deprecated_wallet))
   {
     if (was_deprecated_wallet)
     {
@@ -3001,7 +3013,7 @@ bool simple_wallet::save_watch_only(const std::vector<std::string> &args/* = std
     return true;
   }
 
-  const auto pwd_container = tools::password_container::prompt(true, tr("Password for new watch-only wallet"));
+  const auto pwd_container = password_prompter(tr("Password for new watch-only wallet"), true);
 
   if (!pwd_container)
   {
@@ -3581,14 +3593,25 @@ bool simple_wallet::print_ring_members(const std::vector<tools::wallet2::pending
     const tools::wallet2::tx_construction_data& construction_data = ptx_vector[n].construction_data;
     ostr << boost::format(tr("\nTransaction %llu/%llu: txid=%s")) % (n + 1) % ptx_vector.size() % cryptonote::get_transaction_hash(tx);
     // for each input
-    std::vector<int>          spent_key_height(tx.vin.size());
+    std::vector<uint64_t>          spent_key_height(tx.vin.size());
     std::vector<crypto::hash> spent_key_txid  (tx.vin.size());
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
       if (tx.vin[i].type() != typeid(cryptonote::txin_to_key))
         continue;
       const cryptonote::txin_to_key& in_key = boost::get<cryptonote::txin_to_key>(tx.vin[i]);
-      const cryptonote::tx_source_entry& source = construction_data.sources[i];
+      const tools::wallet2::transfer_details &td = m_wallet->get_transfer_details(construction_data.selected_transfers[i]);
+      const cryptonote::tx_source_entry *sptr = NULL;
+      for (const auto &src: construction_data.sources)
+        if (src.outputs[src.real_output].second.dest == td.get_public_key())
+          sptr = &src;
+      if (!sptr)
+      {
+        fail_msg_writer() << tr("failed to find construction data for tx input");
+        return false;
+      }
+      const cryptonote::tx_source_entry& source = *sptr;
+
       ostr << boost::format(tr("\nInput %llu/%llu: amount=%s")) % (i + 1) % tx.vin.size() % print_money(source.amount);
       // convert relative offsets of ring member keys into absolute offsets (indices) associated with the amount
       std::vector<uint64_t> absolute_offsets = cryptonote::relative_output_offsets_to_absolute(in_key.key_offsets);
@@ -3642,7 +3665,7 @@ bool simple_wallet::print_ring_members(const std::vector<tools::wallet2::pending
       {
         if (spent_key_txid[i] == spent_key_txid[j])
           are_keys_from_same_tx = true;
-        if (std::abs(spent_key_height[i] - spent_key_height[j]) < 5)
+        if (std::abs((int64_t)(spent_key_height[i] - spent_key_height[j])) < (int64_t)5)
           are_keys_from_close_height = true;
       }
     }
@@ -6749,6 +6772,12 @@ void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_
 //----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
+#ifdef WIN32
+  // Activate UTF-8 support for Boost filesystem classes on Windows
+  std::locale::global(boost::locale::generator().generate(""));
+  boost::filesystem::path::imbue(std::locale());
+#endif
+
   po::options_description desc_params(wallet_args::tr("Wallet options"));
   tools::wallet2::init_options(desc_params);
   command_line::add_arg(desc_params, arg_wallet_file);
